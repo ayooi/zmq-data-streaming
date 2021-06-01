@@ -6,12 +6,13 @@ import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
 import org.zeromq.ZMsg;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class DataServiceReaderTest {
 
     @Test
-    public void foo() throws InterruptedException {
+    public void testRead() throws InterruptedException {
         String locatorUrl = "inproc://service-locator-url";
         ZContext ctx = new ZContext();
         String serviceName = "service-name";
@@ -39,5 +40,6 @@ public class DataServiceReaderTest {
         reader.process();
 
         assertTrue(reader.hasData());
+        assertEquals("Payload", new String(reader.take()));
     }
 }

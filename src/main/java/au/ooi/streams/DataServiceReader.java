@@ -95,4 +95,8 @@ public class DataServiceReader implements Runnable {
         return !this.queue.isEmpty();
     }
 
+    public byte[] take() throws InterruptedException {
+        return this.queue.take();
+    }
+
 }
