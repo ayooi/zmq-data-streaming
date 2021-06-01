@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
 
 public class DataServiceReader implements Runnable {
 
@@ -13,21 +14,23 @@ public class DataServiceReader implements Runnable {
     private final ZMQ.Socket dataSocket;
 
     private final String serviceName;
-    private final int readerCount;
     private Set<String> locations = new HashSet<>();
 
-    public DataServiceReader(String serviceName, ZContext ctx, int readerCount, String dataServiceLocatorUrl) {
+    private final ArrayBlockingQueue<byte[]> queue = new ArrayBlockingQueue<>(10000);
+
+    public DataServiceReader(String serviceName, ZContext ctx, String dataServiceLocatorUrl) {
         this.serviceName = serviceName;
-        this.readerCount = readerCount;
-        this.serviceSocket = ctx.createSocket(SocketType.REQ);
+        this.serviceSocket = ctx.createSocket(SocketType.DEALER);
         this.serviceSocket.connect(dataServiceLocatorUrl);
         this.dataSocket = ctx.createSocket(SocketType.PULL);
 
         // Probably yoink this out somehow.
         new Thread(() -> {
-            serviceSocket.sendMore("query");
-            serviceSocket.send(this.serviceName);
-            ZMsg msg = ZMsg.recvMsg(serviceSocket);
+            ZMsg queryMsg = new ZMsg();
+            queryMsg.add("query");
+            queryMsg.add(this.serviceName);
+            queryMsg.send(this.serviceSocket);
+            ZMsg msg = ZMsg.recvMsg(this.serviceSocket);
             ZFrame frame = msg.poll();
             Set<String> locations = new HashSet<>();
             while (frame != null) {
@@ -47,8 +50,8 @@ public class DataServiceReader implements Runnable {
     // Check if we need to adjust what we're connected to
     private void doConnects(Set<String> incoming) {
         List<String> toConnect = new ArrayList<>();
-        for (String location : this.locations) {
-            if (this.locations.contains(location)) {
+        for (String location : incoming) {
+            if (!this.locations.contains(location)) {
                 toConnect.add(location);
             }
         }
@@ -76,8 +79,20 @@ public class DataServiceReader implements Runnable {
     @Override
     public void run() {
         while (true) {
-            System.out.printf("[Reader-%d] %s%n", this.readerCount, dataSocket.recvStr());
+            try {
+                process();
+            } catch (InterruptedException e) {
+                return;
+            }
         }
+    }
+
+    void process() throws InterruptedException {
+        queue.put(dataSocket.recv());
+    }
+
+    public boolean hasData() {
+        return !this.queue.isEmpty();
     }
 
 }

@@ -14,7 +14,7 @@ import static org.junit.Assert.assertEquals;
 public class DataServiceWriterTest {
 
     @Test
-    public void foo() {
+    public void testRegister() {
         ZContext ctx = new ZContext();
 
         ZMQ.Socket router = ctx.createSocket(SocketType.ROUTER);
@@ -26,6 +26,26 @@ public class DataServiceWriterTest {
         writer.connect();
         writer.process();
 
+        ZMsg msg = ZMsg.recvMsg(router);
+        assertEquals(4, msg.size());
+        msg.poll(); // ignore the identity message
+        assertEquals("register", msg.poll().getString(ZMQ.CHARSET));
+        assertEquals(serviceName, msg.poll().getString(ZMQ.CHARSET));
+        assertEquals(dataUrl, msg.poll().getString(ZMQ.CHARSET));
+    }
+
+    @Test
+    public void testWrite() {
+        ZContext ctx = new ZContext();
+
+        ZMQ.Socket router = ctx.createSocket(SocketType.ROUTER);
+        String locatorUrl = "inproc://service-location";
+        router.bind(locatorUrl);
+        String dataUrl = "inproc://random-location";
+        String serviceName = "service-name";
+        DataServiceWriter writer = new DataServiceWriter(serviceName, dataUrl, ctx, locatorUrl);
+        writer.connect();
+
         ZMQ.Socket pull = ctx.createSocket(SocketType.PULL);
         pull.connect(dataUrl);
 
@@ -33,12 +53,5 @@ public class DataServiceWriterTest {
 
         String s = pull.recvStr();
         assertEquals("Payload", s);
-
-        ZMsg msg = ZMsg.recvMsg(router);
-        assertEquals(4, msg.size());
-        msg.poll(); // ignore the identity message
-        assertEquals("register", msg.poll().getString(ZMQ.CHARSET));
-        assertEquals(serviceName, msg.poll().getString(ZMQ.CHARSET));
-        assertEquals(dataUrl, msg.poll().getString(ZMQ.CHARSET));
     }
 }
