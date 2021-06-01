@@ -29,16 +29,17 @@ public class FrameworkMain {
             dataSocket = ctx.createSocket(SocketType.PULL);
             this.location = "ipc://./location-only-available-from-reader" + "-" + readerCount;
             dataSocket.bind(location);
-            System.out.println("Reader bound to " + this.location);
+            System.out.printf("[Reader-%d] bound to %s%n", this.readerCount, this.location);
 
             serviceSocket = ctx.createSocket(SocketType.DEALER);
             serviceSocket.connect(IPC_SERVICE_LOCATOR);
             thread = new Thread(() -> {
-                serviceSocket.setIdentity("Reader".getBytes(StandardCharsets.UTF_8));
+                serviceSocket.setIdentity(String.format("Reader-%d", this.readerCount).getBytes(StandardCharsets.UTF_8));
                 while (true) {
                     serviceSocket.sendMore("register");
                     serviceSocket.sendMore(name);
                     serviceSocket.send(location);
+                    System.out.printf("[Reader-%d] Registered %s to %s%n", this.readerCount, this.location, name);
                     try {
                         Thread.sleep(10000);
                     } catch (InterruptedException e) {
@@ -52,7 +53,7 @@ public class FrameworkMain {
         @Override
         public void run() {
             while (true) {
-                System.out.println("[Reader-" + readerCount + "]" + dataSocket.recvStr());
+                System.out.printf("[Reader-%d] %s%n", this.readerCount, dataSocket.recvStr());
             }
         }
     }
@@ -64,12 +65,14 @@ public class FrameworkMain {
         private ZMQ.Socket dataSocket;
         private Set<String> locations = new HashSet<>();
 
+        private Instant lastCheckTime;
+
         public WriterClient(String app) {
             this.app = app;
             serviceSocket = ctx.createSocket(SocketType.DEALER);
             serviceSocket.setReceiveTimeOut(5000);
             serviceSocket.connect(IPC_SERVICE_LOCATOR);
-            System.out.printf("writer connected service locator at %s%n", IPC_SERVICE_LOCATOR);
+            System.out.printf("[Writer] Connected service locator at %s%n", IPC_SERVICE_LOCATOR);
         }
 
         @Override
@@ -86,10 +89,37 @@ public class FrameworkMain {
                     // ignored
                 }
 
+                if (this.lastCheckTime.isBefore(Instant.now().minusSeconds(10))) {
+                    serviceSocket.sendMore("query");
+                    serviceSocket.send(this.app);
+
+                    ZMsg msg = ZMsg.recvMsg(serviceSocket);
+                    ZFrame frame = msg.poll();
+                    Set<String> locations = new HashSet<>();
+                    while (frame != null) {
+                        String location = frame.getString(ZMQ.CHARSET);
+                        locations.add(location);
+                        frame = msg.poll();
+                    }
+                    for (String location : locations) {
+                        if (this.locations.contains(location)) {
+                            this.dataSocket.connect(location);
+                            System.out.printf("[Writer] Connecting to new provider %s%n", location);
+                        }
+                    }
+                    for (String location : this.locations) {
+                        if (!locations.contains(location)) {
+                            this.dataSocket.disconnect(location);
+                            System.out.printf("[Writer] Disconnecting to new provider %s%n", location);
+                        }
+                    }
+                    this.locations = locations;
+                }
             }
         }
 
         private boolean connect() {
+            this.lastCheckTime = Instant.now();
             if (dataSocket != null) {
                 dataSocket.close();
             }
@@ -109,7 +139,8 @@ public class FrameworkMain {
                 this.dataSocket = ctx.createSocket(SocketType.PUSH);
                 for (String location : locations) {
                     this.dataSocket.connect(location);
-                    System.out.println("Writer connecting to " + location);
+                    this.locations.add(location);
+                    System.out.printf("[Writer] Connecting to %s%n", location);
                 }
                 this.connected = true;
             }
@@ -173,6 +204,7 @@ public class FrameworkMain {
                         Set<Location> locations = this.map.get(name);
                         if (locations != null) {
                             locations.add(new Location(location, Instant.now()));
+                            System.out.printf("[ServiceLocator] registered %s to %s%n", location, name);
                         }
                     }
                 }
@@ -190,7 +222,8 @@ public class FrameworkMain {
         executorService.submit(new WriterClient(FRUITS_PROCESSOR_NAME));
 
         while (true) {
-            Thread.sleep(500);
+            Thread.sleep(5000);
+            executorService.submit(new ReaderClient(FRUITS_PROCESSOR_NAME));
         }
     }
 }
