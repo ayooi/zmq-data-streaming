@@ -23,25 +23,29 @@ public class DataServiceWriter implements Runnable {
     }
 
     public void connect() {
-        this.dataSocket = ctx.createSocket(SocketType.PULL);
+        this.dataSocket = ctx.createSocket(SocketType.PUSH);
         this.dataSocket.bind(this.dataServiceUrl);
         System.out.printf("[Writer] bound to %s%n", this.dataServiceUrl);
         this.serviceSocket = ctx.createSocket(SocketType.DEALER);
         this.serviceSocket.connect(dataServiceLocatorUrl);
+        serviceSocket.setIdentity(String.format("%s Writer", this.serviceName).getBytes(StandardCharsets.UTF_8));
     }
 
     public void put(byte[] type) {
         this.dataSocket.send(type);
     }
 
+    public void process() {
+        serviceSocket.sendMore("register");
+        serviceSocket.sendMore(this.serviceName);
+        serviceSocket.send(this.dataServiceUrl);
+        System.out.printf("[Writer] Registered %s to %s%n", this.dataServiceUrl, serviceName);
+    }
+
     @Override
     public void run() {
-        serviceSocket.setIdentity(String.format("Writer").getBytes(StandardCharsets.UTF_8));
         while (true) {
-            serviceSocket.sendMore("register");
-            serviceSocket.sendMore(this.serviceName);
-            serviceSocket.send(this.dataServiceUrl);
-            System.out.printf("[Writer] Registered %s to %s%n", this.dataServiceUrl, serviceName);
+            process();
             try {
                 Thread.sleep(10000);
             } catch (InterruptedException e) {
@@ -49,39 +53,4 @@ public class DataServiceWriter implements Runnable {
             }
         }
     }
-
-
-//    @Override
-//    public void run() {
-//        while (true) {
-//            this.dataSocket.send("Apple");
-//
-//            if (this.lastCheckTime.isBefore(Instant.now().minusSeconds(10))) {
-//                serviceSocket.sendMore("query");
-//                serviceSocket.send(this.app);
-//
-//                ZMsg msg = ZMsg.recvMsg(serviceSocket);
-//                ZFrame frame = msg.poll();
-//                Set<String> locations = new HashSet<>();
-//                while (frame != null) {
-//                    String location = frame.getString(ZMQ.CHARSET);
-//                    locations.add(location);
-//                    frame = msg.poll();
-//                }
-//                for (String location : locations) {
-//                    if (this.locations.contains(location)) {
-//                        this.dataSocket.connect(location);
-//                        System.out.printf("[Writer] Connecting to new provider %s%n", location);
-//                    }
-//                }
-//                for (String location : this.locations) {
-//                    if (!locations.contains(location)) {
-//                        this.dataSocket.disconnect(location);
-//                        System.out.printf("[Writer] Disconnecting to new provider %s%n", location);
-//                    }
-//                }
-//                this.locations = locations;
-//            }
-//        }
-//    }
 }
