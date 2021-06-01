@@ -4,12 +4,13 @@
 
 This will describe the solution for a Service Locator solution for data transfer through our system.
 
-## Problems:
+## Goals:
 
 * Data transfer cannot be lost
 * Dynamic discovery of endpoints
 * Endpoints must not be discoverable if they no longer exist
 * Inter-host transfer of data must be allowed
+* New instances of applications must be able to be seamlessly introduced
 
 ## Centralized vs Decentralized?
 
@@ -41,7 +42,7 @@ Firstly, describe a simplest as possible scenario to get us started.
 
 #### Disadvantages
 
-* Single point of failure across the system
+* Single point of failure
 * Requires clients to regularly request for updates
 * Updates are applied slowly as clients need to poll
 * No ability to keep data flowing across services on a local host. All data may be consumed by any host within the
@@ -65,6 +66,23 @@ determination within application level code whether it should connect to all ava
 immediate host. Another possibility might be simply to reserve ```tcp://``` endpoints for inter-host distribution
 and ```ipc://``` for local only distribution
 
+## System Centralized vs. Distributed Host Centralized vs. True Decentralized
+
+An important question to answer is whether we should do a single DSL on the common host or something more distributed.
+We have two other options. Breaking up the DSL into an instance for each host or doing a true client side service
+discovery. We're pretty familiar with the concept of a System Centralized DSL so lets explore the other options:
+
+### Distributed Host Centralized
+
+* Each host has its own DSL deployed to it
+* Each DSL has to know of each other and share state.
+* This is a bit like the old host agents isn't it? and it kinda sucks because our hosts are not all the same
+* I think i'm abandoning the idea of a Distributed Host Centralized model as it kinda sucks
+
+## 
+
+
+
 ## Procedure
 
 ### Registration
@@ -73,7 +91,7 @@ Frame structure (Req):
 
 1. 'register'
 2. \<service-name\>
-3. ipc://\<location\>
+3. ipc://\<serviceLocation\>
 
 ### Query
 
@@ -84,12 +102,12 @@ Frame Structure (Req):
 
 Frame Structure (Rep):
 
-1. \[repeated\] ipc://\<location\>
+1. \[repeated\] ipc://\<serviceLocation\>
 
 ## Restrictions
 
 * Writers perform the bind
-* Readers expect to have to connect and read data from multiple locations
+* Readers expect to have to connect and read data from multiple serviceLocations
 * All data transfer sockets are PUSH/PULL
 * (Optional) support for non-blocking PUSH/PULL sockets
 
