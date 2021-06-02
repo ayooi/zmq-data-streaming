@@ -2,16 +2,14 @@ package au.ooi.streams;
 
 import org.zeromq.*;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 
 public class DataServiceReader implements Runnable {
 
     private final ZMQ.Socket serviceSocket;
     private final ZMQ.Socket dataSocket;
+    private final ZMQ.Socket controlSocket;
 
     private final String serviceName;
     private Set<String> locations = new HashSet<>();
@@ -22,7 +20,12 @@ public class DataServiceReader implements Runnable {
         this.serviceName = serviceName;
         this.serviceSocket = ctx.createSocket(SocketType.DEALER);
         this.serviceSocket.connect(dataServiceLocatorUrl);
+        this.controlSocket = ctx.createSocket(SocketType.PUSH);
+        String controlUrl = String.format("inproc://%s", UUID.randomUUID());
+        this.controlSocket.bind(controlUrl);
         this.dataSocket = ctx.createSocket(SocketType.PULL);
+        this.dataSocket.connect(controlUrl);
+
 
         // Probably yoink this out somehow.
         new Thread(() -> {
@@ -39,11 +42,6 @@ public class DataServiceReader implements Runnable {
                 frame = msg.poll();
             }
             doConnects(locations);
-            try {
-                Thread.sleep(30000);
-            } catch (InterruptedException e) {
-                // ignored
-            }
         }).start();
     }
 
@@ -66,12 +64,13 @@ public class DataServiceReader implements Runnable {
         if (!toDisconnect.isEmpty() || !toConnect.isEmpty()) {
             for (String location : toDisconnect) {
                 this.dataSocket.disconnect(location);
-                System.out.printf("[Writer] Disconnecting from old provider %s%n", location);
+                System.out.printf("[Reader] Disconnecting from old provider %s%n", location);
             }
             for (String location : toConnect) {
                 this.dataSocket.connect(location);
-                System.out.printf("[Writer] Connecting to new provider %s%n", location);
+                System.out.printf("[Reader] Connecting to new provider %s%n", location);
             }
+            this.controlSocket.send("IgnoreMe");
         }
         this.locations = incoming;
     }
@@ -88,7 +87,12 @@ public class DataServiceReader implements Runnable {
     }
 
     void process() throws InterruptedException {
-        queue.put(dataSocket.recv());
+        byte[] recv = dataSocket.recv();
+        String s = new String(recv);
+        if (s.equals("IgnoreMe")) {
+            return;
+        }
+        queue.put(recv);
     }
 
     public boolean hasData() {

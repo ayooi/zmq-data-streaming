@@ -22,7 +22,7 @@ public class DataServiceWriter implements Runnable {
         this.dataServiceLocatorUrl = dataServiceLocatorUrl;
     }
 
-    public void connect() {
+    public void startup() {
         this.dataSocket = ctx.createSocket(SocketType.PUSH);
         this.dataSocket.bind(this.dataServiceUrl);
         System.out.printf("[Writer] bound to %s%n", this.dataServiceUrl);
@@ -39,7 +39,6 @@ public class DataServiceWriter implements Runnable {
         serviceSocket.sendMore("register");
         serviceSocket.sendMore(this.serviceName);
         serviceSocket.send(this.dataServiceUrl);
-        System.out.printf("[Writer] Registered %s to %s%n", this.dataServiceUrl, serviceName);
     }
 
     @Override

@@ -1,6 +1,5 @@
 package au.ooi.streams;
 
-import org.junit.Assert;
 import org.junit.Test;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
@@ -8,6 +7,7 @@ import org.zeromq.ZMQ;
 import org.zeromq.ZMsg;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 
 import static org.junit.Assert.assertEquals;
 
@@ -23,15 +23,15 @@ public class DataServiceWriterTest {
         String dataUrl = "inproc://random-location";
         String serviceName = "service-name";
         DataServiceWriter writer = new DataServiceWriter(serviceName, dataUrl, ctx, locatorUrl);
-        writer.connect();
+        writer.startup();
         writer.process();
 
         ZMsg msg = ZMsg.recvMsg(router);
         assertEquals(4, msg.size());
         msg.poll(); // ignore the identity message
-        assertEquals("register", msg.poll().getString(ZMQ.CHARSET));
-        assertEquals(serviceName, msg.poll().getString(ZMQ.CHARSET));
-        assertEquals(dataUrl, msg.poll().getString(ZMQ.CHARSET));
+        assertEquals("register", Objects.requireNonNull(msg.poll()).getString(ZMQ.CHARSET));
+        assertEquals(serviceName, Objects.requireNonNull(msg.poll()).getString(ZMQ.CHARSET));
+        assertEquals(dataUrl, Objects.requireNonNull(msg.poll()).getString(ZMQ.CHARSET));
     }
 
     @Test
@@ -44,7 +44,7 @@ public class DataServiceWriterTest {
         String dataUrl = "inproc://random-location";
         String serviceName = "service-name";
         DataServiceWriter writer = new DataServiceWriter(serviceName, dataUrl, ctx, locatorUrl);
-        writer.connect();
+        writer.startup();
 
         ZMQ.Socket pull = ctx.createSocket(SocketType.PULL);
         pull.connect(dataUrl);
