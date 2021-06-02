@@ -1,5 +1,7 @@
 package au.ooi.streams;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.Value;
 import org.zeromq.*;
 
@@ -47,11 +49,12 @@ public class DataServiceLocator implements Runnable {
 
                 ServiceLocations serviceLocations = null;
                 String addressString = address.getString(StandardCharsets.UTF_8);
-                List<PendingRequest> put = knownRequesters.put(serviceName, new ArrayList<>());
+                List<PendingRequest> put = knownRequesters.putIfAbsent(serviceName, new ArrayList<>());
                 boolean shouldSend = false;
                 if (put == null) {
                     // first time seeing this requester so we should immediately send back known service endpoints
                     shouldSend = true;
+                    knownRequesters.get(serviceName).add(new PendingRequest(address, serviceName, addressString, timeProvider.now()));
                 } else {
                     serviceLocations = serviceStore.query(serviceName);
                     Optional<PendingRequest> pendingRequest = put.stream().filter(x -> x.getAddressString().equals(addressString)).findFirst();
@@ -61,11 +64,13 @@ public class DataServiceLocator implements Runnable {
                             // and now, then we should resend the list of locations
                             shouldSend = true;
                         }
+                        put.remove(pendingRequest.get());
+                        put.add(new PendingRequest(address, serviceName, addressString, timeProvider.now()));
                     } else {
                         shouldSend = true;
+                        knownRequesters.get(serviceName).add(new PendingRequest(address, serviceName, addressString, timeProvider.now()));
                     }
                 }
-                knownRequesters.get(serviceName).add(new PendingRequest(address, serviceName, addressString, timeProvider.now()));
 
                 if (shouldSend) {
                     if (serviceLocations == null) {

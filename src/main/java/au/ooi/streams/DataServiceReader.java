@@ -25,6 +25,7 @@ public class DataServiceReader implements Runnable {
         this.serviceSocket = ctx.createSocket(SocketType.DEALER);
         String identity = UUID.randomUUID().toString();
         this.serviceSocket.setIdentity(identity.getBytes(StandardCharsets.UTF_8));
+        this.serviceSocket.setSendTimeOut(5);
         System.out.println("Created reader with identity " + identity);
         this.serviceSocket.connect(dataServiceLocatorUrl);
 
@@ -36,23 +37,37 @@ public class DataServiceReader implements Runnable {
 
         // Probably yoink this out somehow.
         executorService.submit(() -> {
+            ZMQ.Poller poller = ctx.createPoller(1);
+            poller.register(this.serviceSocket, ZMQ.Poller.POLLIN);
             while (true) {
                 ZMsg queryMsg = new ZMsg();
                 queryMsg.add("query");
                 queryMsg.add(this.serviceName);
                 try {
-                    queryMsg.send(this.serviceSocket);
-                    ZMsg msg = ZMsg.recvMsg(this.serviceSocket, true);
-                    ZFrame frame = msg.poll();
-                    Set<String> locations = new HashSet<>();
-                    while (frame != null) {
-                        String location = frame.getString(ZMQ.CHARSET);
-                        locations.add(location);
-                        frame = msg.poll();
+                    boolean send = queryMsg.send(this.serviceSocket);
+                    if (!send) {
+                        continue;
                     }
-                    doConnects(locations);
+                    int poll = poller.poll(10000);
+                    if(poll == -1) {
+                        return;
+                    }
+                    if(poller.pollin(0)) {
+                        ZMsg msg = ZMsg.recvMsg(this.serviceSocket);
+                        ZFrame frame = msg.poll();
+                        Set<String> locations = new HashSet<>();
+                        while (frame != null) {
+                            String location = frame.getString(ZMQ.CHARSET);
+                            locations.add(location);
+                            frame = msg.poll();
+                        }
+                        doConnects(locations);
+                    }
+                    else {
+                        continue;
+                    }
                 } catch (ZMQException e) {
-                    // ignored
+                    return;
                 }
             }
         });

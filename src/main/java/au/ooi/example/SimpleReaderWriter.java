@@ -39,8 +39,9 @@ public class SimpleReaderWriter {
         Thread.sleep(1000);
 
         Instant start = Instant.now();
+        int totalPackets = 10000000;
         new Thread(() -> {
-            for (int i = 0; i < 10000000; i++) {
+            for (int i = 0; i < totalPackets; i++) {
                 writer.put("Payload".getBytes(StandardCharsets.UTF_8));
             }
         }).start();
@@ -50,7 +51,7 @@ public class SimpleReaderWriter {
                 do {
                     reader2.take();
                     count2++;
-                } while (count2 + count1 < 10000000);
+                } while (count2 + count1 < totalPackets);
             } catch (InterruptedException e) {
                 // ignored
             }
@@ -61,13 +62,13 @@ public class SimpleReaderWriter {
                 do {
                     reader1.take();
                     count1++;
-                } while (count2 + count1 < 10000000);
+                } while (count2 + count1 < totalPackets);
             } catch (InterruptedException e) {
                 // ignored
             }
         });
 
-        while ((count2 + count1) < 10000000) {
+        while ((count2 + count1) < totalPackets) {
             // just spin
             Thread.sleep(50);
         }
