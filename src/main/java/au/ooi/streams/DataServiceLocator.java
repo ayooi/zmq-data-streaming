@@ -2,9 +2,9 @@ package au.ooi.streams;
 
 import org.zeromq.*;
 
-import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class DataServiceLocator implements Runnable {
 
