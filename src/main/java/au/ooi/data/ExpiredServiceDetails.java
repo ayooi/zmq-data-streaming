@@ -1,9 +1,9 @@
-package au.ooi.streams;
+package au.ooi.data;
 
 import lombok.Value;
 
 @Value
-class ExpiredServiceDetails {
+public class ExpiredServiceDetails {
     String serviceName;
     String location;
 }
