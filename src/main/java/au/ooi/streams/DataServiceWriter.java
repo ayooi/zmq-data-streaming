@@ -25,6 +25,7 @@ public class DataServiceWriter implements Runnable {
 
     public void startup() {
         this.dataSocket = ctx.createSocket(SocketType.PUSH);
+        this.dataSocket.setHWM(1000);
         this.dataSocket.bind(this.dataServiceUrl);
         System.out.printf("[Writer] bound to %s%n", this.dataServiceUrl);
         this.serviceSocket = ctx.createSocket(SocketType.DEALER);

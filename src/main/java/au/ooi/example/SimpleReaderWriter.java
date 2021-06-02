@@ -3,7 +3,8 @@ package au.ooi.example;
 import au.ooi.streams.DataServiceLocator;
 import au.ooi.streams.DataServiceReader;
 import au.ooi.streams.DataServiceWriter;
-import au.ooi.streams.RealTimeProvider;
+import au.ooi.externals.RealTimeProvider;
+import au.ooi.streams.ServiceStore;
 import org.zeromq.ZContext;
 
 import java.nio.charset.StandardCharsets;
@@ -19,22 +20,26 @@ public class SimpleReaderWriter {
     private static int count1 = 0;
     private static int count2 = 0;
 
-    // Doesn't shutdown properly because I'm lazy :(
     public static void main(String[] args) throws InterruptedException {
         ZContext ctx = new ZContext();
-        DataServiceLocator dataServiceLocator = new DataServiceLocator(ctx, SERVICE_LOCATOR_URL, 10, new RealTimeProvider());
         ExecutorService executorService = Executors.newCachedThreadPool();
+        final RealTimeProvider timeProvider = new RealTimeProvider();
+        ServiceStore serviceStore = new ServiceStore(10, timeProvider);
+        executorService.submit(serviceStore);
+        DataServiceLocator dataServiceLocator = new DataServiceLocator(ctx, SERVICE_LOCATOR_URL, 10, timeProvider, serviceStore);
         executorService.submit(dataServiceLocator);
 
         DataServiceWriter writer = new DataServiceWriter(SERVICE_NAME, "inproc://data-url", ctx, SERVICE_LOCATOR_URL);
         writer.startup();
         executorService.submit(writer);
 
-        DataServiceReader reader1 = new DataServiceReader(SimpleReaderWriter.SERVICE_NAME, ctx, SERVICE_LOCATOR_URL, executorService);
+        DataServiceReader reader1 = new DataServiceReader(SimpleReaderWriter.SERVICE_NAME, ctx, SERVICE_LOCATOR_URL);
         executorService.submit(reader1);
+        executorService.submit(reader1.getRunnable());
 
-        DataServiceReader reader2 = new DataServiceReader(SimpleReaderWriter.SERVICE_NAME, ctx, SERVICE_LOCATOR_URL, executorService);
+        DataServiceReader reader2 = new DataServiceReader(SimpleReaderWriter.SERVICE_NAME, ctx, SERVICE_LOCATOR_URL);
         executorService.submit(reader2);
+        executorService.submit(reader2.getRunnable());
 
         Thread.sleep(1000);
 

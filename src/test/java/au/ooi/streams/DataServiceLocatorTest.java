@@ -19,7 +19,8 @@ public class DataServiceLocatorTest {
 
     @Test
     public void testSingleRegister() {
-        dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, 30, new RealTimeProvider());
+        final RealTimeProvider timeProvider = new RealTimeProvider();
+        dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, 30, timeProvider, new ServiceStore(30, timeProvider));
 
         ZMQ.Socket socket = ctx.createSocket(SocketType.DEALER);
         socket.connect(serviceUrl);
@@ -34,10 +35,10 @@ public class DataServiceLocatorTest {
         assertEquals(dataUrl, query.get(0));
     }
 
-
     @Test
     public void testMultipleRegister() {
-        dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, 30, new RealTimeProvider());
+        final RealTimeProvider timeProvider = new RealTimeProvider();
+        dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, 30, timeProvider, new ServiceStore(30, timeProvider));
 
         ZMQ.Socket socket = ctx.createSocket(SocketType.DEALER);
         socket.setIdentity("identity-1".getBytes(StandardCharsets.UTF_8));

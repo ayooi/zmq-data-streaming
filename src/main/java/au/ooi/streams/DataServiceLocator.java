@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 
 public class DataServiceLocator implements Runnable {
 
@@ -24,11 +25,11 @@ public class DataServiceLocator implements Runnable {
     private final ServiceStore serviceStore;
     private final Map<String, List<PendingRequest>> knownRequesters = new ConcurrentHashMap<>();
 
-    public DataServiceLocator(ZContext ctx, String serviceBindUrl, int timeoutSeconds, TimeProvider timeProvider) {
-        socket = ctx.createSocket(SocketType.ROUTER);
-        this.timeProvider = timeProvider;
+    public DataServiceLocator(ZContext ctx, String serviceBindUrl, int timeoutSeconds, TimeProvider timeProvider, ServiceStore serviceStore) {
+        this.socket = ctx.createSocket(SocketType.ROUTER);
         socket.bind(serviceBindUrl);
-        serviceStore = new ServiceStore(timeoutSeconds, timeProvider);
+        this.timeProvider = timeProvider;
+        this.serviceStore = serviceStore;
     }
 
     void process() {

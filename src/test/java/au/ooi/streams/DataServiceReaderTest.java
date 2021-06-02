@@ -34,7 +34,8 @@ public class DataServiceReaderTest {
             }
         }).start();
 
-        DataServiceReader reader = new DataServiceReader(serviceName, ctx, locatorUrl, Executors.newCachedThreadPool());
+        DataServiceReader reader = new DataServiceReader(serviceName, ctx, locatorUrl);
+        Executors.newCachedThreadPool().submit(reader.getRunnable());
 
         ZMQ.Socket socket = ctx.createSocket(SocketType.PUSH);
         socket.bind(dataUrl);

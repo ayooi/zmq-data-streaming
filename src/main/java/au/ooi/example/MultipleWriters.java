@@ -3,7 +3,8 @@ package au.ooi.example;
 import au.ooi.streams.DataServiceLocator;
 import au.ooi.streams.DataServiceReader;
 import au.ooi.streams.DataServiceWriter;
-import au.ooi.streams.RealTimeProvider;
+import au.ooi.externals.RealTimeProvider;
+import au.ooi.streams.ServiceStore;
 import org.zeromq.ZContext;
 
 import java.nio.charset.StandardCharsets;
@@ -17,16 +18,20 @@ public class MultipleWriters {
 
     public static void main(String[] args) throws InterruptedException {
         ZContext ctx = new ZContext();
-        DataServiceLocator dataServiceLocator = new DataServiceLocator(ctx, SERVICE_LOCATOR_URL, 10, new RealTimeProvider());
         ExecutorService executorService = Executors.newCachedThreadPool();
+        final RealTimeProvider timeProvider = new RealTimeProvider();
+        ServiceStore serviceStore = new ServiceStore(10, timeProvider);
+        executorService.submit(serviceStore);
+        DataServiceLocator dataServiceLocator = new DataServiceLocator(ctx, SERVICE_LOCATOR_URL, 10, timeProvider, serviceStore);
         executorService.submit(dataServiceLocator);
 
         DataServiceWriter writer1 = new DataServiceWriter(SERVICE_NAME, "inproc://data-url-1", ctx, SERVICE_LOCATOR_URL);
         writer1.startup();
         executorService.submit(writer1);
 
-        DataServiceReader reader1 = new DataServiceReader(SERVICE_NAME, ctx, SERVICE_LOCATOR_URL, executorService);
+        DataServiceReader reader1 = new DataServiceReader(SERVICE_NAME, ctx, SERVICE_LOCATOR_URL);
         executorService.submit(reader1);
+        executorService.submit(reader1.getRunnable());
 
         executorService.submit(() -> {
             for (int i = 0; i < 5000000; i++) {

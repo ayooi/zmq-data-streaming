@@ -1,7 +1,7 @@
 package au.ooi.streams;
 
+import lombok.Getter;
 import org.zeromq.*;
-import zmq.ZError;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -16,15 +16,16 @@ public class DataServiceReader implements Runnable {
     private final ZMQ.Socket controlSocket;
 
     private final String serviceName;
+    @Getter
+    private final Runnable runnable;
     private Set<String> locations = new HashSet<>();
 
     private final ArrayBlockingQueue<byte[]> queue = new ArrayBlockingQueue<>(10000);
-    private final String identity;
 
-    public DataServiceReader(String serviceName, ZContext ctx, String dataServiceLocatorUrl, ExecutorService executorService) {
+    public DataServiceReader(String serviceName, ZContext ctx, String dataServiceLocatorUrl) {
         this.serviceName = serviceName;
         serviceSocket = ctx.createSocket(SocketType.DEALER);
-        identity = UUID.randomUUID().toString();
+        String identity = UUID.randomUUID().toString();
         serviceSocket.setIdentity(identity.getBytes(StandardCharsets.UTF_8));
         serviceSocket.setSendTimeOut(5);
         System.out.println("Created reader with identity " + identity);
@@ -37,7 +38,7 @@ public class DataServiceReader implements Runnable {
         dataSocket.connect(controlUrl);
 
         // Probably yoink this out somehow.
-        executorService.submit(() -> {
+        this.runnable = () -> {
             ZMQ.Poller poller = ctx.createPoller(1);
             poller.register(serviceSocket, ZMQ.Poller.POLLIN);
             ZMsg queryMsg = new ZMsg();
@@ -51,10 +52,10 @@ public class DataServiceReader implements Runnable {
                         continue;
                     }
                     int poll = poller.poll(10000);
-                    if(poll == -1) {
+                    if (poll == -1) {
                         return;
                     }
-                    if(poller.pollin(0)) {
+                    if (poller.pollin(0)) {
                         ZMsg msg = ZMsg.recvMsg(serviceSocket);
                         ZFrame frame = msg.poll();
                         Set<String> locations = new HashSet<>();
@@ -69,7 +70,7 @@ public class DataServiceReader implements Runnable {
                     return;
                 }
             }
-        });
+        };
     }
 
     // Check if we need to adjust what we're connected to
