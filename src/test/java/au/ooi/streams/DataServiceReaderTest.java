@@ -37,6 +37,8 @@ public class DataServiceReaderTest {
         socket.bind(dataUrl);
         socket.send("Payload");
 
+        // call twice because there will have been a IgnoreMessage that came through
+        reader.process();
         reader.process();
 
         assertTrue(reader.hasData());

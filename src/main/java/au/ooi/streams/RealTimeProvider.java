@@ -7,4 +7,9 @@ public class RealTimeProvider implements TimeProvider {
     public Instant now() {
         return Instant.now();
     }
+
+    @Override
+    public void sleep(long milliseconds) throws InterruptedException {
+        Thread.sleep(milliseconds);
+    }
 }

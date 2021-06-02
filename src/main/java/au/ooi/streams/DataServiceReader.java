@@ -65,7 +65,6 @@ public class DataServiceReader implements Runnable {
             }
         }
 
-        // may have to lock around this
         if (!toDisconnect.isEmpty() || !toConnect.isEmpty()) {
             for (String location : toDisconnect) {
                 this.dataSocket.disconnect(location);
@@ -75,6 +74,7 @@ public class DataServiceReader implements Runnable {
                 this.dataSocket.connect(location);
                 System.out.printf("[Reader] Connecting to new provider %s%n", location);
             }
+            // necessary to resolve any blocking .recv() calls so that the changes take hold even when there is not data
             this.controlSocket.send(THE_IGNORE_ME_MESSAGE);
         }
         this.locations = incoming;

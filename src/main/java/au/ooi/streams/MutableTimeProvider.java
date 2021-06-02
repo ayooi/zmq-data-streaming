@@ -21,4 +21,9 @@ public class MutableTimeProvider implements TimeProvider {
     public Instant now() {
         return this.instant;
     }
+
+    @Override
+    public void sleep(long milliseconds) throws InterruptedException{
+        // dont do anything
+    }
 }

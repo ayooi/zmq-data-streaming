@@ -11,7 +11,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class SimpleReaderWriter {
 
@@ -75,7 +74,11 @@ public class SimpleReaderWriter {
 
         Instant end = Instant.now();
         float timeTakenMs = Math.abs(Duration.between(end, start).toMillis());
-        System.out.printf("Took %02f milliseconds (%02f/pps) [count1 = %d, count2 = %d] ", timeTakenMs, (count2 + count1) / (timeTakenMs / 1000), count1, count2);
+        System.out.printf("Took %02f milliseconds (%02f/pps) [count1 = %d, count2 = %d]%n",
+                timeTakenMs,
+                (count2 + count1) / (timeTakenMs / 1000),
+                count1,
+                count2);
         executorService.shutdownNow();
         ctx.close();
     }

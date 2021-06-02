@@ -38,7 +38,7 @@ public class ServiceStore implements Runnable {
         Map<String, Instant> serviceLocations;
         serviceLocations = Objects.requireNonNullElse(existing, incoming);
 
-        serviceLocations.put(location, this.timeProvider.now());
+        Instant existingEntry = serviceLocations.put(location, this.timeProvider.now());
         try {
             queue.put(new ExpiryTracker(serviceName, location, this.timeProvider.now().plusSeconds(this.timeoutSeconds)));
         } catch (InterruptedException e) {
@@ -46,7 +46,7 @@ public class ServiceStore implements Runnable {
         }
 
         // Allows callers to know if this should result in an update being pushed.
-        return existing == null;
+        return existing == null || existingEntry == null;
     }
 
     public ServiceLocations query(String serviceName) {
@@ -69,7 +69,7 @@ public class ServiceStore implements Runnable {
         Instant now = this.timeProvider.now();
         Duration between = Duration.between(now, take.expiryTime);
         if (!between.isNegative()) {
-            Thread.sleep(between.toMillis());
+            this.timeProvider.sleep(between.toMillis());
         }
 
         Map<String, Instant> serviceLocations = this.map.get(take.getServiceName());

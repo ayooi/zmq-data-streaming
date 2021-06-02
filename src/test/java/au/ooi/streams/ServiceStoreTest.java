@@ -17,6 +17,18 @@ public class ServiceStoreTest {
     }
 
     @Test
+    public void multipleRegister() {
+        ServiceStore serviceStore = new ServiceStore(1, new MutableTimeProvider(Instant.EPOCH));
+        boolean register = serviceStore.register("service-name", "location-1");
+        assertTrue(register);
+        register = serviceStore.register("service-name", "location-2");
+        assertTrue(register);
+        ServiceLocations query = serviceStore.query("service-name");
+        assertTrue(query.getLocations().contains("location-1"));
+        assertTrue(query.getLocations().contains("location-2"));
+    }
+
+    @Test
     public void basicTimeout() throws InterruptedException {
         MutableTimeProvider timeProvider = new MutableTimeProvider(Instant.EPOCH);
         ServiceStore serviceStore = new ServiceStore(1, timeProvider);
