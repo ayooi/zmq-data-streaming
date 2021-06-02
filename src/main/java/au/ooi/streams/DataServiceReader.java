@@ -19,32 +19,34 @@ public class DataServiceReader implements Runnable {
     private Set<String> locations = new HashSet<>();
 
     private final ArrayBlockingQueue<byte[]> queue = new ArrayBlockingQueue<>(10000);
+    private final String identity;
 
     public DataServiceReader(String serviceName, ZContext ctx, String dataServiceLocatorUrl, ExecutorService executorService) {
         this.serviceName = serviceName;
-        this.serviceSocket = ctx.createSocket(SocketType.DEALER);
-        String identity = UUID.randomUUID().toString();
-        this.serviceSocket.setIdentity(identity.getBytes(StandardCharsets.UTF_8));
-        this.serviceSocket.setSendTimeOut(5);
+        serviceSocket = ctx.createSocket(SocketType.DEALER);
+        identity = UUID.randomUUID().toString();
+        serviceSocket.setIdentity(identity.getBytes(StandardCharsets.UTF_8));
+        serviceSocket.setSendTimeOut(5);
         System.out.println("Created reader with identity " + identity);
-        this.serviceSocket.connect(dataServiceLocatorUrl);
+        serviceSocket.connect(dataServiceLocatorUrl);
 
-        this.controlSocket = ctx.createSocket(SocketType.PUSH);
+        controlSocket = ctx.createSocket(SocketType.PUSH);
         String controlUrl = String.format("inproc://%s", UUID.randomUUID());
-        this.controlSocket.bind(controlUrl);
-        this.dataSocket = ctx.createSocket(SocketType.PULL);
-        this.dataSocket.connect(controlUrl);
+        controlSocket.bind(controlUrl);
+        dataSocket = ctx.createSocket(SocketType.PULL);
+        dataSocket.connect(controlUrl);
 
         // Probably yoink this out somehow.
         executorService.submit(() -> {
             ZMQ.Poller poller = ctx.createPoller(1);
-            poller.register(this.serviceSocket, ZMQ.Poller.POLLIN);
+            poller.register(serviceSocket, ZMQ.Poller.POLLIN);
+            ZMsg queryMsg = new ZMsg();
+            queryMsg.add("query");
+            queryMsg.add(this.serviceName);
+
             while (true) {
-                ZMsg queryMsg = new ZMsg();
-                queryMsg.add("query");
-                queryMsg.add(this.serviceName);
                 try {
-                    boolean send = queryMsg.send(this.serviceSocket);
+                    boolean send = queryMsg.send(serviceSocket);
                     if (!send) {
                         continue;
                     }
@@ -53,7 +55,7 @@ public class DataServiceReader implements Runnable {
                         return;
                     }
                     if(poller.pollin(0)) {
-                        ZMsg msg = ZMsg.recvMsg(this.serviceSocket);
+                        ZMsg msg = ZMsg.recvMsg(serviceSocket);
                         ZFrame frame = msg.poll();
                         Set<String> locations = new HashSet<>();
                         while (frame != null) {
@@ -62,9 +64,6 @@ public class DataServiceReader implements Runnable {
                             frame = msg.poll();
                         }
                         doConnects(locations);
-                    }
-                    else {
-                        continue;
                     }
                 } catch (ZMQException e) {
                     return;
@@ -77,12 +76,12 @@ public class DataServiceReader implements Runnable {
     private void doConnects(Set<String> incoming) {
         List<String> toConnect = new ArrayList<>();
         for (String location : incoming) {
-            if (!this.locations.contains(location)) {
+            if (!locations.contains(location)) {
                 toConnect.add(location);
             }
         }
         List<String> toDisconnect = new ArrayList<>();
-        for (String location : this.locations) {
+        for (String location : locations) {
             if (!incoming.contains(location)) {
                 toDisconnect.add(location);
             }
@@ -90,17 +89,17 @@ public class DataServiceReader implements Runnable {
 
         if (!toDisconnect.isEmpty() || !toConnect.isEmpty()) {
             for (String location : toDisconnect) {
-                this.dataSocket.disconnect(location);
+                dataSocket.disconnect(location);
                 System.out.printf("[Reader] Disconnecting from old provider %s%n", location);
             }
             for (String location : toConnect) {
-                this.dataSocket.connect(location);
+                dataSocket.connect(location);
                 System.out.printf("[Reader] Connecting to new provider %s%n", location);
             }
             // necessary to resolve any blocking .recv() calls so that the changes take hold even when there is not data
-            this.controlSocket.send(THE_IGNORE_ME_MESSAGE);
+            controlSocket.send(THE_IGNORE_ME_MESSAGE);
         }
-        this.locations = incoming;
+        locations = incoming;
     }
 
     @Override
@@ -124,11 +123,11 @@ public class DataServiceReader implements Runnable {
     }
 
     public boolean hasData() {
-        return !this.queue.isEmpty();
+        return !queue.isEmpty();
     }
 
     public byte[] take() throws InterruptedException {
-        return this.queue.take();
+        return queue.take();
     }
 
 }

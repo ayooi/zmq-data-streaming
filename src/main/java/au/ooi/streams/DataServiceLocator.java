@@ -1,7 +1,5 @@
 package au.ooi.streams;
 
-import lombok.Getter;
-import lombok.Setter;
 import lombok.Value;
 import org.zeromq.*;
 
@@ -14,9 +12,8 @@ public class DataServiceLocator implements Runnable {
 
     @Value
     class PendingRequest {
-        ZFrame address;
         String serviceRequested;
-        String addressString;
+        String address;
         Instant received;
     }
 
@@ -54,10 +51,10 @@ public class DataServiceLocator implements Runnable {
                 if (put == null) {
                     // first time seeing this requester so we should immediately send back known service endpoints
                     shouldSend = true;
-                    knownRequesters.get(serviceName).add(new PendingRequest(address, serviceName, addressString, timeProvider.now()));
+                    knownRequesters.get(serviceName).add(new PendingRequest(serviceName, addressString, timeProvider.now()));
                 } else {
                     serviceLocations = serviceStore.query(serviceName);
-                    Optional<PendingRequest> pendingRequest = put.stream().filter(x -> x.getAddressString().equals(addressString)).findFirst();
+                    Optional<PendingRequest> pendingRequest = put.stream().filter(x -> x.getAddress().equals(addressString)).findFirst();
                     if (pendingRequest.isPresent()) {
                         if (serviceLocations.getLastUpdated().isAfter(pendingRequest.get().getReceived())) {
                             // if the locations of services has been updated between the last time we received a request
@@ -65,10 +62,10 @@ public class DataServiceLocator implements Runnable {
                             shouldSend = true;
                         }
                         put.remove(pendingRequest.get());
-                        put.add(new PendingRequest(address, serviceName, addressString, timeProvider.now()));
+                        put.add(new PendingRequest(serviceName, addressString, timeProvider.now()));
                     } else {
                         shouldSend = true;
-                        knownRequesters.get(serviceName).add(new PendingRequest(address, serviceName, addressString, timeProvider.now()));
+                        knownRequesters.get(serviceName).add(new PendingRequest(serviceName, addressString, timeProvider.now()));
                     }
                 }
 
@@ -82,8 +79,6 @@ public class DataServiceLocator implements Runnable {
                         for (String serviceLocation : serviceLocations.getLocations()) {
                             result.add(serviceLocation);
                         }
-                    } else {
-                        result.add("Not Found");
                     }
                     result.send(socket);
                 }
