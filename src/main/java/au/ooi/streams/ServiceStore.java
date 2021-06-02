@@ -31,7 +31,7 @@ public class ServiceStore implements Runnable {
         this.timeProvider = timeProvider;
     }
 
-    public void register(String serviceName, String location) {
+    public boolean register(String serviceName, String location) {
         Map<String, Instant> incoming = new ConcurrentHashMap<>();
         Map<String, Instant> existing = map.putIfAbsent(serviceName, incoming);
 
@@ -39,11 +39,15 @@ public class ServiceStore implements Runnable {
         serviceLocations = Objects.requireNonNullElse(existing, incoming);
 
         serviceLocations.put(location, this.timeProvider.now());
+
         try {
             queue.put(new ExpiryTracker(serviceName, location, this.timeProvider.now().plusSeconds(this.timeoutSeconds)));
         } catch (InterruptedException e) {
             // ignored for now
         }
+
+        // Allows callers to know if this should result in an update being pushed.
+        return existing == null;
     }
 
     public List<String> query(String serviceName) {
@@ -77,6 +81,7 @@ public class ServiceStore implements Runnable {
             try {
                 processTimeout();
             } catch (InterruptedException e) {
+                // ignored
             }
         }
     }
