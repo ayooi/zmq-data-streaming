@@ -39,7 +39,6 @@ public class ServiceStore implements Runnable {
         serviceLocations = Objects.requireNonNullElse(existing, incoming);
 
         serviceLocations.put(location, this.timeProvider.now());
-
         try {
             queue.put(new ExpiryTracker(serviceName, location, this.timeProvider.now().plusSeconds(this.timeoutSeconds)));
         } catch (InterruptedException e) {
@@ -50,12 +49,18 @@ public class ServiceStore implements Runnable {
         return existing == null;
     }
 
-    public List<String> query(String serviceName) {
+    public ServiceLocations query(String serviceName) {
         Map<String, Instant> serviceLocations = this.map.get(serviceName);
         if (serviceLocations == null) {
-            return Collections.emptyList();
+            return new ServiceLocations(Collections.emptyList(), this.timeProvider.now());
         } else {
-            return new ArrayList<>(serviceLocations.keySet());
+            Optional<Instant> first = serviceLocations.values()
+                    .stream().max(Instant::compareTo)
+                    .stream().findFirst();
+            if (first.isEmpty()) {
+                throw new IllegalStateException("Something exploded");
+            }
+            return new ServiceLocations(new ArrayList<>(serviceLocations.keySet()), first.get());
         }
     }
 

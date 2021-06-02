@@ -1,20 +1,32 @@
 package au.ooi.streams;
 
+import lombok.Value;
 import org.zeromq.*;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class DataServiceLocator implements Runnable {
 
-    private final ZMQ.Socket socket;
-    private final ServiceStore serviceStore;
+    @Value
+    class PendingRequest {
+        ZFrame address;
+        String serviceRequested;
+        String addressString;
+        Instant received;
+    }
 
-    public DataServiceLocator(ZContext ctx, String serviceBindUrl, int timeoutSeconds) {
+    private final ZMQ.Socket socket;
+    private final TimeProvider timeProvider;
+    private final ServiceStore serviceStore;
+    private final Map<String, List<PendingRequest>> knownRequesters = new ConcurrentHashMap<>();
+
+    public DataServiceLocator(ZContext ctx, String serviceBindUrl, int timeoutSeconds, TimeProvider timeProvider) {
         socket = ctx.createSocket(SocketType.ROUTER);
+        this.timeProvider = timeProvider;
         socket.bind(serviceBindUrl);
-        serviceStore = new ServiceStore(timeoutSeconds, new RealTimeProvider());
+        serviceStore = new ServiceStore(timeoutSeconds, timeProvider);
     }
 
     void process() {
@@ -31,38 +43,79 @@ public class DataServiceLocator implements Runnable {
                 ZFrame data = msg.poll();
                 assert (data != null);
                 String serviceName = data.getString(ZMQ.CHARSET);
-                List<String> serviceLocations = this.serviceStore.query(serviceName);
-                ZMsg result = new ZMsg();
-                result.add(address);
-                if (serviceLocations != null) {
-                    for (String serviceLocation : serviceLocations) {
-                        result.add(serviceLocation);
-                    }
+
+                ServiceLocations serviceLocations = null;
+                String addressString = address.getString(ZMQ.CHARSET);
+                List<PendingRequest> put = knownRequesters.put(addressString, new ArrayList<>());
+                boolean shouldSend = false;
+                if (put == null) {
+                    // first time seeing this requester so we should immediately send back known service endpoints
+                    shouldSend = true;
+                    knownRequesters.get(addressString).add(new PendingRequest(address, serviceName, addressString, timeProvider.now()));
                 } else {
-                    result.add("Not Found");
+                    serviceLocations = serviceStore.query(serviceName);
+                    Optional<PendingRequest> pendingRequest = put.stream().filter(x -> x.getAddressString().equals(addressString)).findFirst();
+                    if (pendingRequest.isPresent()) {
+                        if (serviceLocations.getLastUpdated().isAfter(pendingRequest.get().getReceived())) {
+                            // if the locations of services has been updated between the last time we received a request
+                            // and now, then we should resend the list of locations
+                            shouldSend = true;
+                        }
+                    }
                 }
-                result.send(socket);
+
+                if (shouldSend) {
+                    if (serviceLocations == null) {
+                        serviceLocations = this.serviceStore.query(serviceName);
+                    }
+                    ZMsg result = new ZMsg();
+                    result.add(address);
+                    if (serviceLocations != null) {
+                        for (String serviceLocation : serviceLocations.getLocations()) {
+                            result.add(serviceLocation);
+                        }
+                    } else {
+                        result.add("Not Found");
+                    }
+                    result.send(socket);
+                }
             }
             case "register" -> {
                 ZFrame nameFrame = msg.poll();
                 assert (nameFrame != null);
                 String serviceName = nameFrame.getString(ZMQ.CHARSET);
-
                 ZFrame locationFrame = msg.poll();
                 assert (locationFrame != null);
                 String location = locationFrame.getString(ZMQ.CHARSET);
-                this.serviceStore.register(serviceName, location);
-                System.out.printf("[ServiceLocator] registered %s to %s%n", location, serviceName);
+                boolean register = this.serviceStore.register(serviceName, location);
+                if (register) {
+                    System.out.printf("[ServiceLocator] registered %s to %s%n", location, serviceName);
+                    // we need to send back all pending queries for this locations that satisfy this service name
+                    List<PendingRequest> pendingRequests = this.knownRequesters.get(serviceName);
+                    if (pendingRequests == null) {
+                        return;
+                    }
+
+                    ServiceLocations serviceLocations = this.serviceStore.query(serviceName);
+                    for (PendingRequest pendingRequest : pendingRequests) {
+                        ZMsg result = new ZMsg();
+                        result.add(pendingRequest.getAddress());
+                        for (String loc : serviceLocations.getLocations()) {
+                            result.add(loc);
+                        }
+                        result.send(this.socket);
+                    }
+                }
             }
         }
     }
 
     public List<String> query(String serviceName) {
-        List<String> serviceLocations = this.serviceStore.query(serviceName);
-        if (serviceLocations.isEmpty()) {
+        ServiceLocations serviceLocations = this.serviceStore.query(serviceName);
+        if (serviceLocations.getLocations().isEmpty()) {
             return Collections.emptyList();
         } else {
-            return new ArrayList<>(serviceLocations);
+            return new ArrayList<>(serviceLocations.getLocations());
         }
     }
 

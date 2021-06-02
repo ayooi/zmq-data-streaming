@@ -3,7 +3,6 @@ package au.ooi.streams;
 import org.junit.Test;
 
 import java.time.Instant;
-import java.util.List;
 
 import static org.junit.Assert.*;
 
@@ -13,8 +12,8 @@ public class ServiceStoreTest {
     public void basicQuerying() {
         ServiceStore serviceStore = new ServiceStore(1, new MutableTimeProvider(Instant.EPOCH));
         serviceStore.register("service-name", "location");
-        List<String> query = serviceStore.query("service-name");
-        assertTrue(query.contains("location"));
+        ServiceLocations query = serviceStore.query("service-name");
+        assertTrue(query.getLocations().contains("location"));
     }
 
     @Test

@@ -18,7 +18,7 @@ public class DataServiceLocatorTest {
 
     @Test
     public void testRegister() {
-        dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, 30);
+        dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, 30, new RealTimeProvider());
 
         ZMQ.Socket socket = ctx.createSocket(SocketType.DEALER);
         socket.connect(serviceUrl);
