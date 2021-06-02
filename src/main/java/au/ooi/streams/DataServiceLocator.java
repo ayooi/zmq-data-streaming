@@ -5,16 +5,17 @@ import org.zeromq.*;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 public class DataServiceLocator implements Runnable {
 
     private final ZMQ.Socket socket;
+    private final int timeoutSeconds;
 
-    private final Map<String, Set<ServiceLocation>> map = new ConcurrentHashMap<>();
+    private final ServiceStore serviceStore = new ServiceStore();
 
-    public DataServiceLocator(ZContext ctx, String serviceBindUrl) {
+    public DataServiceLocator(ZContext ctx, String serviceBindUrl, int timeoutSeconds) {
         socket = ctx.createSocket(SocketType.ROUTER);
+        this.timeoutSeconds = timeoutSeconds;
         socket.bind(serviceBindUrl);
     }
 
@@ -31,7 +32,8 @@ public class DataServiceLocator implements Runnable {
             case "query" -> {
                 ZFrame data = msg.poll();
                 assert (data != null);
-                Set<ServiceLocation> serviceLocations = map.get(data.getString(ZMQ.CHARSET));
+                String serviceName = data.getString(ZMQ.CHARSET);
+                List<ServiceLocation> serviceLocations = this.serviceStore.query(serviceName);
                 ZMsg result = new ZMsg();
                 result.add(address);
                 if (serviceLocations != null) {
@@ -46,23 +48,19 @@ public class DataServiceLocator implements Runnable {
             case "register" -> {
                 ZFrame nameFrame = msg.poll();
                 assert (nameFrame != null);
-                String name = nameFrame.getString(ZMQ.CHARSET);
+                String serviceName = nameFrame.getString(ZMQ.CHARSET);
 
                 ZFrame locationFrame = msg.poll();
                 assert (locationFrame != null);
                 String location = locationFrame.getString(ZMQ.CHARSET);
-                this.map.putIfAbsent(name, new HashSet<>());
-                Set<ServiceLocation> serviceLocations = this.map.get(name);
-                if (serviceLocations != null) {
-                    serviceLocations.add(new ServiceLocation(location, Instant.now()));
-                    System.out.printf("[ServiceLocator] registered %s to %s%n", location, name);
-                }
+                this.serviceStore.register(serviceName, location);
+                System.out.printf("[ServiceLocator] registered %s to %s%n", location, serviceName);
             }
         }
     }
 
     public List<ServiceLocation> query(String serviceName) {
-        Set<ServiceLocation> serviceLocations = this.map.get(serviceName);
+        List<ServiceLocation> serviceLocations = this.serviceStore.query(serviceName);
         if (serviceLocations.isEmpty()) {
             return Collections.emptyList();
         } else {

@@ -1,6 +1,5 @@
 package au.ooi.streams;
 
-import org.junit.Assert;
 import org.junit.Test;
 import org.zeromq.*;
 
@@ -19,7 +18,7 @@ public class DataServiceLocatorTest {
 
     @Test
     public void testRegister() {
-        dataServiceLocator = new DataServiceLocator(ctx, serviceUrl);
+        dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, 30);
 
         ZMQ.Socket socket = ctx.createSocket(SocketType.DEALER);
         socket.connect(serviceUrl);
