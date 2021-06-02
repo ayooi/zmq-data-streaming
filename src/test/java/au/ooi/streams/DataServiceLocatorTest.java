@@ -28,9 +28,9 @@ public class DataServiceLocatorTest {
         socket.send(dataUrl);
 
         dataServiceLocator.process();
-        List<ServiceLocation> query = dataServiceLocator.query(serviceName);
+        List<String> query = dataServiceLocator.query(serviceName);
         assertEquals(1, query.size());
-        assertEquals(dataUrl, query.get(0).getLocation());
+        assertEquals(dataUrl, query.get(0));
     }
 
     @Test

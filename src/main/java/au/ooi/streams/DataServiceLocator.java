@@ -9,14 +9,12 @@ import java.util.List;
 public class DataServiceLocator implements Runnable {
 
     private final ZMQ.Socket socket;
-    private final int timeoutSeconds;
-
-    private final ServiceStore serviceStore = new ServiceStore();
+    private final ServiceStore serviceStore;
 
     public DataServiceLocator(ZContext ctx, String serviceBindUrl, int timeoutSeconds) {
         socket = ctx.createSocket(SocketType.ROUTER);
-        this.timeoutSeconds = timeoutSeconds;
         socket.bind(serviceBindUrl);
+        serviceStore = new ServiceStore(timeoutSeconds, new RealTimeProvider());
     }
 
     void process() {
@@ -33,12 +31,12 @@ public class DataServiceLocator implements Runnable {
                 ZFrame data = msg.poll();
                 assert (data != null);
                 String serviceName = data.getString(ZMQ.CHARSET);
-                List<ServiceLocation> serviceLocations = this.serviceStore.query(serviceName);
+                List<String> serviceLocations = this.serviceStore.query(serviceName);
                 ZMsg result = new ZMsg();
                 result.add(address);
                 if (serviceLocations != null) {
-                    for (ServiceLocation serviceLocation : serviceLocations) {
-                        result.add(serviceLocation.getLocation());
+                    for (String serviceLocation : serviceLocations) {
+                        result.add(serviceLocation);
                     }
                 } else {
                     result.add("Not Found");
@@ -59,8 +57,8 @@ public class DataServiceLocator implements Runnable {
         }
     }
 
-    public List<ServiceLocation> query(String serviceName) {
-        List<ServiceLocation> serviceLocations = this.serviceStore.query(serviceName);
+    public List<String> query(String serviceName) {
+        List<String> serviceLocations = this.serviceStore.query(serviceName);
         if (serviceLocations.isEmpty()) {
             return Collections.emptyList();
         } else {
