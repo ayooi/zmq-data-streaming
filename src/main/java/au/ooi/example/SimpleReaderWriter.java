@@ -46,27 +46,27 @@ public class SimpleReaderWriter {
             }
         }).start();
 
-        new Thread(() -> {
+        executorService.submit(() -> {
             try {
                 do {
                     reader2.take();
                     count2++;
                 } while (count2 + count1 < 10000000);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                // ignored
             }
-        }).start();
+        });
 
-        new Thread(() -> {
+        executorService.submit(() -> {
             try {
                 do {
                     reader1.take();
                     count1++;
                 } while (count2 + count1 < 10000000);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                // ignored
             }
-        }).start();
+        });
 
         while ((count2 + count1) < 10000000) {
             // just spin
@@ -76,6 +76,7 @@ public class SimpleReaderWriter {
         Instant end = Instant.now();
         float timeTakenMs = Math.abs(Duration.between(end, start).toMillis());
         System.out.printf("Took %02f milliseconds (%02f/pps) [count1 = %d, count2 = %d] ", timeTakenMs, (count2 + count1) / (timeTakenMs / 1000), count1, count2);
-
+        executorService.shutdownNow();
+        ctx.close();
     }
 }
