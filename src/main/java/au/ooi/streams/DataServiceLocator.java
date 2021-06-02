@@ -3,6 +3,7 @@ package au.ooi.streams;
 import lombok.Value;
 import org.zeromq.*;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,7 +46,7 @@ public class DataServiceLocator implements Runnable {
                 String serviceName = data.getString(ZMQ.CHARSET);
 
                 ServiceLocations serviceLocations = null;
-                String addressString = address.getString(ZMQ.CHARSET);
+                String addressString = address.getString(StandardCharsets.UTF_8);
                 List<PendingRequest> put = knownRequesters.put(addressString, new ArrayList<>());
                 boolean shouldSend = false;
                 if (put == null) {

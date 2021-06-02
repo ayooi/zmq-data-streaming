@@ -2,11 +2,13 @@ package au.ooi.streams;
 
 import org.zeromq.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 
 public class DataServiceReader implements Runnable {
 
+    public static final String THE_IGNORE_ME_MESSAGE = "###IgnoreMe###";
     private final ZMQ.Socket serviceSocket;
     private final ZMQ.Socket dataSocket;
     private final ZMQ.Socket controlSocket;
@@ -19,13 +21,16 @@ public class DataServiceReader implements Runnable {
     public DataServiceReader(String serviceName, ZContext ctx, String dataServiceLocatorUrl) {
         this.serviceName = serviceName;
         this.serviceSocket = ctx.createSocket(SocketType.DEALER);
+        String identity = UUID.randomUUID().toString();
+        this.serviceSocket.setIdentity(identity.getBytes(StandardCharsets.UTF_8));
+        System.out.println("Created reader with identity " + identity);
         this.serviceSocket.connect(dataServiceLocatorUrl);
+
         this.controlSocket = ctx.createSocket(SocketType.PUSH);
         String controlUrl = String.format("inproc://%s", UUID.randomUUID());
         this.controlSocket.bind(controlUrl);
         this.dataSocket = ctx.createSocket(SocketType.PULL);
         this.dataSocket.connect(controlUrl);
-
 
         // Probably yoink this out somehow.
         new Thread(() -> {
@@ -70,7 +75,7 @@ public class DataServiceReader implements Runnable {
                 this.dataSocket.connect(location);
                 System.out.printf("[Reader] Connecting to new provider %s%n", location);
             }
-            this.controlSocket.send("IgnoreMe");
+            this.controlSocket.send(THE_IGNORE_ME_MESSAGE);
         }
         this.locations = incoming;
     }
@@ -89,7 +94,7 @@ public class DataServiceReader implements Runnable {
     void process() throws InterruptedException {
         byte[] recv = dataSocket.recv();
         String s = new String(recv);
-        if (s.equals("IgnoreMe")) {
+        if (s.equals(THE_IGNORE_ME_MESSAGE)) {
             return;
         }
         queue.put(recv);
