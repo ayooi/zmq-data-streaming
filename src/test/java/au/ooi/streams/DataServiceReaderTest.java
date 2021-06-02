@@ -6,6 +6,9 @@ import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
 import org.zeromq.ZMsg;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -31,7 +34,7 @@ public class DataServiceReaderTest {
             }
         }).start();
 
-        DataServiceReader reader = new DataServiceReader(serviceName, ctx, locatorUrl);
+        DataServiceReader reader = new DataServiceReader(serviceName, ctx, locatorUrl, Executors.newCachedThreadPool());
 
         ZMQ.Socket socket = ctx.createSocket(SocketType.PUSH);
         socket.bind(dataUrl);

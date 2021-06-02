@@ -25,15 +25,26 @@ public class MultipleWriters {
         writer1.startup();
         executorService.submit(writer1);
 
-        DataServiceReader reader1 = new DataServiceReader(SimpleReaderWriter.SERVICE_NAME, ctx, SERVICE_LOCATOR_URL);
+        DataServiceReader reader1 = new DataServiceReader(SERVICE_NAME, ctx, SERVICE_LOCATOR_URL, executorService);
         executorService.submit(reader1);
 
         executorService.submit(() -> {
             for (int i = 0; i < 5000000; i++) {
                 writer1.put("Payload".getBytes(StandardCharsets.UTF_8));
             }
+            System.out.println("Writer 1 is done writing payloads");
         });
 
+        executorService.submit(() -> {
+            do {
+                try {
+                    reader1.take();
+                } catch (InterruptedException e) {
+                    // ignored
+                }
+                count1++;
+            } while (count1 < 10000000);
+        });
 
         executorService.submit(() -> {
             try {
@@ -48,12 +59,13 @@ public class MultipleWriters {
             for (int i = 0; i < 5000000; i++) {
                 writer2.put("Payload".getBytes(StandardCharsets.UTF_8));
             }
+            System.out.println("Writer 2 is done writing payloads");
         });
 
-        do {
-            reader1.take();
-            count1++;
-        } while (count1 < 10000000);
+        while (count1 < 10000000) {
+            // just spin
+            Thread.sleep(50);
+        }
 
         System.out.printf("Successfully received 10000000 items %n");
         executorService.shutdownNow();

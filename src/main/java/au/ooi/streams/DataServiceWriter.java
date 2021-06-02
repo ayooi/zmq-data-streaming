@@ -5,6 +5,7 @@ import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
 
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 
 public class DataServiceWriter implements Runnable {
@@ -27,8 +28,8 @@ public class DataServiceWriter implements Runnable {
         this.dataSocket.bind(this.dataServiceUrl);
         System.out.printf("[Writer] bound to %s%n", this.dataServiceUrl);
         this.serviceSocket = ctx.createSocket(SocketType.DEALER);
+        this.serviceSocket.setIdentity(UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8));
         this.serviceSocket.connect(dataServiceLocatorUrl);
-        serviceSocket.setIdentity(String.format("%s Writer", this.serviceName).getBytes(StandardCharsets.UTF_8));
     }
 
     public void put(byte[] type) {

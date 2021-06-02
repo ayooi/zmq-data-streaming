@@ -1,10 +1,12 @@
 package au.ooi.streams;
 
 import org.zeromq.*;
+import zmq.ZError;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
 
 public class DataServiceReader implements Runnable {
 
@@ -18,7 +20,7 @@ public class DataServiceReader implements Runnable {
 
     private final ArrayBlockingQueue<byte[]> queue = new ArrayBlockingQueue<>(10000);
 
-    public DataServiceReader(String serviceName, ZContext ctx, String dataServiceLocatorUrl) {
+    public DataServiceReader(String serviceName, ZContext ctx, String dataServiceLocatorUrl, ExecutorService executorService) {
         this.serviceName = serviceName;
         this.serviceSocket = ctx.createSocket(SocketType.DEALER);
         String identity = UUID.randomUUID().toString();
@@ -33,21 +35,27 @@ public class DataServiceReader implements Runnable {
         this.dataSocket.connect(controlUrl);
 
         // Probably yoink this out somehow.
-        new Thread(() -> {
-            ZMsg queryMsg = new ZMsg();
-            queryMsg.add("query");
-            queryMsg.add(this.serviceName);
-            queryMsg.send(this.serviceSocket);
-            ZMsg msg = ZMsg.recvMsg(this.serviceSocket);
-            ZFrame frame = msg.poll();
-            Set<String> locations = new HashSet<>();
-            while (frame != null) {
-                String location = frame.getString(ZMQ.CHARSET);
-                locations.add(location);
-                frame = msg.poll();
+        executorService.submit(() -> {
+            while (true) {
+                ZMsg queryMsg = new ZMsg();
+                queryMsg.add("query");
+                queryMsg.add(this.serviceName);
+                try {
+                    queryMsg.send(this.serviceSocket);
+                    ZMsg msg = ZMsg.recvMsg(this.serviceSocket, true);
+                    ZFrame frame = msg.poll();
+                    Set<String> locations = new HashSet<>();
+                    while (frame != null) {
+                        String location = frame.getString(ZMQ.CHARSET);
+                        locations.add(location);
+                        frame = msg.poll();
+                    }
+                    doConnects(locations);
+                } catch (ZMQException e) {
+                    // ignored
+                }
             }
-            doConnects(locations);
-        }).start();
+        });
     }
 
     // Check if we need to adjust what we're connected to

@@ -47,12 +47,11 @@ public class DataServiceLocator implements Runnable {
 
                 ServiceLocations serviceLocations = null;
                 String addressString = address.getString(StandardCharsets.UTF_8);
-                List<PendingRequest> put = knownRequesters.put(addressString, new ArrayList<>());
+                List<PendingRequest> put = knownRequesters.put(serviceName, new ArrayList<>());
                 boolean shouldSend = false;
                 if (put == null) {
                     // first time seeing this requester so we should immediately send back known service endpoints
                     shouldSend = true;
-                    knownRequesters.get(addressString).add(new PendingRequest(address, serviceName, addressString, timeProvider.now()));
                 } else {
                     serviceLocations = serviceStore.query(serviceName);
                     Optional<PendingRequest> pendingRequest = put.stream().filter(x -> x.getAddressString().equals(addressString)).findFirst();
@@ -62,8 +61,11 @@ public class DataServiceLocator implements Runnable {
                             // and now, then we should resend the list of locations
                             shouldSend = true;
                         }
+                    } else {
+                        shouldSend = true;
                     }
                 }
+                knownRequesters.get(serviceName).add(new PendingRequest(address, serviceName, addressString, timeProvider.now()));
 
                 if (shouldSend) {
                     if (serviceLocations == null) {
@@ -88,8 +90,8 @@ public class DataServiceLocator implements Runnable {
                 ZFrame locationFrame = msg.poll();
                 assert (locationFrame != null);
                 String location = locationFrame.getString(ZMQ.CHARSET);
-                boolean register = this.serviceStore.register(serviceName, location);
-                if (register) {
+                boolean updated = this.serviceStore.register(serviceName, location);
+                if (updated) {
                     System.out.printf("[ServiceLocator] registered %s to %s%n", location, serviceName);
                     // we need to send back all pending queries for this locations that satisfy this service name
                     List<PendingRequest> pendingRequests = this.knownRequesters.get(serviceName);

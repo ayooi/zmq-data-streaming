@@ -30,10 +30,10 @@ public class SimpleReaderWriter {
         writer.startup();
         executorService.submit(writer);
 
-        DataServiceReader reader1 = new DataServiceReader(SimpleReaderWriter.SERVICE_NAME, ctx, SERVICE_LOCATOR_URL);
+        DataServiceReader reader1 = new DataServiceReader(SimpleReaderWriter.SERVICE_NAME, ctx, SERVICE_LOCATOR_URL, executorService);
         executorService.submit(reader1);
 
-        DataServiceReader reader2 = new DataServiceReader(SimpleReaderWriter.SERVICE_NAME, ctx, SERVICE_LOCATOR_URL);
+        DataServiceReader reader2 = new DataServiceReader(SimpleReaderWriter.SERVICE_NAME, ctx, SERVICE_LOCATOR_URL, executorService);
         executorService.submit(reader2);
 
         Thread.sleep(1000);
