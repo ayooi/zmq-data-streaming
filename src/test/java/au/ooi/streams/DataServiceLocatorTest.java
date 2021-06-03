@@ -64,7 +64,7 @@ public class DataServiceLocatorTest {
     }
 
     @Test
-    public void testPendingRetrieval() {
+    public void testPendingRetrievalOnRemoval() {
         MutableTimeProvider timeProvider = new MutableTimeProvider(Instant.EPOCH);
         ServiceStore serviceStore = new ServiceStore(30, timeProvider);
         dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, timeProvider, serviceStore);
@@ -112,7 +112,6 @@ public class DataServiceLocatorTest {
 
         poller.poll(0);
         assertTrue(poller.pollin(0));
-
     }
 
     @Test
@@ -124,15 +123,12 @@ public class DataServiceLocatorTest {
         socket.setIdentity("identity-1".getBytes(StandardCharsets.UTF_8));
         socket.connect(serviceUrl);
 
-        socket.sendMore("register");
-        socket.sendMore(serviceName);
-        socket.send("inproc://data-url-1");
-
-        socket.sendMore("register");
-        socket.sendMore(serviceName);
-        socket.send("inproc://data-url-2");
-
+        // register the first endpoint
+        new ZMsg().addLast("register").addLast(serviceName).addLast("inproc://data-url-1").send(socket);
         dataServiceLocator.process();
+
+        // register the next endpoint
+        new ZMsg().addLast("register").addLast(serviceName).addLast("inproc://data-url-2").send(socket);
         dataServiceLocator.process();
 
         List<String> query = dataServiceLocator.query(serviceName);
@@ -140,14 +136,12 @@ public class DataServiceLocatorTest {
         assertEquals("inproc://data-url-1", query.get(0));
         assertEquals("inproc://data-url-2", query.get(1));
 
-        socket.sendMore("query");
-        socket.send(serviceName);
+        new ZMsg().addLast("query").addLast(serviceName).send(socket);
         dataServiceLocator.process();
         ZMsg msg = ZMsg.recvMsg(socket);
         assertEquals(2, msg.size());
 
-        socket.sendMore("query");
-        socket.send(serviceName);
+        new ZMsg().addLast("query").addLast(serviceName).send(socket);
         dataServiceLocator.process();
         ZMQ.Poller poller = ctx.createPoller(1);
         poller.register(socket, ZMQ.Poller.POLLIN);
@@ -163,6 +157,8 @@ public class DataServiceLocatorTest {
 
         poller.poll(0);
         assertTrue(poller.pollin(0));
+        msg = ZMsg.recvMsg(socket);
+        assertEquals(3, msg.size());
     }
 
     @Test

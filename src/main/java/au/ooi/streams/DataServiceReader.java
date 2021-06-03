@@ -6,7 +6,6 @@ import org.zeromq.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ExecutorService;
 
 public class DataServiceReader implements Runnable {
 
