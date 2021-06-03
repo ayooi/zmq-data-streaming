@@ -19,7 +19,7 @@ public class DataServiceFactoryTest {
         MutableTimeProvider timeProvider = new MutableTimeProvider(Instant.EPOCH);
         ZContext ctx = new ZContext();
         ExecutorService executorService = Executors.newCachedThreadPool();
-        DataServiceLocator dataServiceLocator = new DataServiceLocator(ctx, serviceLocatorUrl, 10, timeProvider, new ServiceStore(10, timeProvider));
+        DataServiceLocator dataServiceLocator = new DataServiceLocator(ctx, serviceLocatorUrl, timeProvider, new ServiceStore(10, timeProvider));
         executorService.submit(dataServiceLocator);
         DataServiceFactory dataServiceFactory = new DataServiceFactory(ctx, serviceLocatorUrl, executorService);
         String serviceName = "service-name";

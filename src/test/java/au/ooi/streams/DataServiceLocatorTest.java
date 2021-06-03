@@ -1,10 +1,12 @@
 package au.ooi.streams;
 
+import au.ooi.externals.MutableTimeProvider;
 import au.ooi.externals.RealTimeProvider;
 import org.junit.Test;
 import org.zeromq.*;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 
 import static org.junit.Assert.*;
@@ -19,8 +21,8 @@ public class DataServiceLocatorTest {
 
     @Test
     public void testSingleRegister() {
-        final RealTimeProvider timeProvider = new RealTimeProvider();
-        dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, 30, timeProvider, new ServiceStore(30, timeProvider));
+        MutableTimeProvider timeProvider = new MutableTimeProvider(Instant.EPOCH);
+        dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, timeProvider, new ServiceStore(30, timeProvider));
 
         ZMQ.Socket socket = ctx.createSocket(SocketType.DEALER);
         socket.connect(serviceUrl);
@@ -36,9 +38,35 @@ public class DataServiceLocatorTest {
     }
 
     @Test
+    public void testBasicRemoval() {
+        MutableTimeProvider timeProvider = new MutableTimeProvider(Instant.EPOCH);
+        ServiceStore serviceStore = new ServiceStore(30, timeProvider);
+        dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, timeProvider, serviceStore);
+
+        ZMQ.Socket socket = ctx.createSocket(SocketType.DEALER);
+        socket.connect(serviceUrl);
+
+        new ZMsg().addLast("register")
+                .addLast(serviceName)
+                .addLast(dataUrl)
+                .send(socket);
+
+        dataServiceLocator.process();
+        assertFalse(serviceStore.query(serviceName).getLocations().isEmpty());
+
+        new ZMsg().addLast("deregister")
+                .addLast(serviceName)
+                .addLast(dataUrl)
+                .send(socket);
+
+        dataServiceLocator.process();
+        assertTrue(serviceStore.query(serviceName).getLocations().isEmpty());
+    }
+
+    @Test
     public void testMultipleRegister() {
-        final RealTimeProvider timeProvider = new RealTimeProvider();
-        dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, 30, timeProvider, new ServiceStore(30, timeProvider));
+        MutableTimeProvider timeProvider = new MutableTimeProvider(Instant.EPOCH);
+        dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, timeProvider, new ServiceStore(30, timeProvider));
 
         ZMQ.Socket socket = ctx.createSocket(SocketType.DEALER);
         socket.setIdentity("identity-1".getBytes(StandardCharsets.UTF_8));

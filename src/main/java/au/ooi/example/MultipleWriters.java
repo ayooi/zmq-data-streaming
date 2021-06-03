@@ -22,7 +22,7 @@ public class MultipleWriters {
         final RealTimeProvider timeProvider = new RealTimeProvider();
         ServiceStore serviceStore = new ServiceStore(10, timeProvider);
         executorService.submit(serviceStore);
-        DataServiceLocator dataServiceLocator = new DataServiceLocator(ctx, SERVICE_LOCATOR_URL, 10, timeProvider, serviceStore);
+        DataServiceLocator dataServiceLocator = new DataServiceLocator(ctx, SERVICE_LOCATOR_URL, timeProvider, serviceStore);
         executorService.submit(dataServiceLocator);
 
         DataServiceWriter writer1 = new DataServiceWriter(SERVICE_NAME, "inproc://data-url-1", ctx, SERVICE_LOCATOR_URL);

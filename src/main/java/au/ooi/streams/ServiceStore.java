@@ -11,7 +11,7 @@ import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class ServiceStore implements Runnable {
+public class ServiceStore implements Runnable, ServiceStoreInterface {
 
     private int timeoutSeconds;
     private TimeProvider timeProvider;
@@ -34,6 +34,17 @@ public class ServiceStore implements Runnable {
         this.timeProvider = timeProvider;
     }
 
+    @Override
+    public boolean remove(String serviceName, String location) {
+        Map<String, Instant> locationMap = this.map.get(serviceName);
+        if (locationMap != null) {
+            Instant remove = locationMap.remove(location);
+            return remove != null;
+        }
+        return false;
+    }
+
+    @Override
     public boolean register(String serviceName, String location) {
         Map<String, Instant> incoming = new ConcurrentHashMap<>();
         Map<String, Instant> existing = map.putIfAbsent(serviceName, incoming);
@@ -52,17 +63,18 @@ public class ServiceStore implements Runnable {
         return existing == null || existingEntry == null;
     }
 
+    @Override
     public ServiceLocations query(String serviceName) {
         Map<String, Instant> serviceLocations = this.map.get(serviceName);
         if (serviceLocations == null) {
             return new ServiceLocations(Collections.emptyList(), this.timeProvider.now());
         } else {
+            if (serviceLocations.isEmpty()) {
+                return new ServiceLocations(Collections.emptyList(), this.timeProvider.now());
+            }
             Optional<Instant> first = serviceLocations.values()
                     .stream().max(Instant::compareTo)
                     .stream().findFirst();
-            if (first.isEmpty()) {
-                throw new IllegalStateException("Something exploded");
-            }
             return new ServiceLocations(new ArrayList<>(serviceLocations.keySet()), first.get());
         }
     }
@@ -94,10 +106,12 @@ public class ServiceStore implements Runnable {
         }
     }
 
+    @Override
     public boolean hasEvents() {
         return !this.expiredEvents.isEmpty();
     }
 
+    @Override
     public ExpiredServiceDetails take() throws InterruptedException {
         return this.expiredEvents.take();
     }
