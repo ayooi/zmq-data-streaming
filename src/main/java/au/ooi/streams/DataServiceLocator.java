@@ -108,6 +108,7 @@ public class DataServiceLocator implements Runnable {
                 String location = locationFrame.getString(ZMQ.CHARSET);
                 boolean updated = this.serviceStore.remove(serviceName, location);
                 if (updated) {
+                    System.out.printf("[ServiceLocator] Deregistered %s from %s%n", location, serviceName);
                     notifyPendingClients(serviceName);
                 }
             }
@@ -146,7 +147,11 @@ public class DataServiceLocator implements Runnable {
 
     public void run() {
         while (true) {
-            process();
+            try {
+                process();
+            } catch (RuntimeException e) {
+                e.printStackTrace();
+            }
         }
     }
 }
