@@ -127,6 +127,10 @@ public class DataServiceLocator implements Runnable {
             for (String loc : serviceLocations.getLocations()) {
                 result.add(loc);
             }
+            if (serviceLocations.getLocations().isEmpty()) {
+                // Remember that the frame structure is address + something even if that something is blank
+                result.add("");
+            }
             result.send(this.socket);
         }
     }

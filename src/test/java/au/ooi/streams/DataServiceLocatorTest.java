@@ -64,6 +64,58 @@ public class DataServiceLocatorTest {
     }
 
     @Test
+    public void testPendingRetrieval() {
+        MutableTimeProvider timeProvider = new MutableTimeProvider(Instant.EPOCH);
+        ServiceStore serviceStore = new ServiceStore(30, timeProvider);
+        dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, timeProvider, serviceStore);
+
+        ZMQ.Socket socket = ctx.createSocket(SocketType.DEALER);
+        socket.setIdentity("identity".getBytes(StandardCharsets.UTF_8));
+        socket.connect(serviceUrl);
+
+        new ZMsg().addLast("register")
+                .addLast(serviceName)
+                .addLast(dataUrl)
+                .send(socket);
+
+        dataServiceLocator.process();
+
+        // send the first query
+        new ZMsg().addLast("query")
+                .addLast(serviceName)
+                .send(socket);
+
+        ZMQ.Poller poller = ctx.createPoller(1);
+        poller.register(socket, ZMQ.Poller.POLLIN);
+        dataServiceLocator.process();
+
+        poller.poll(0);
+        assertTrue(poller.pollin(0));
+        ZMsg queryResult = ZMsg.recvMsg(socket);
+        assertEquals(1, queryResult.size());
+
+        // Resend the query and we would not expect a response straight away for this one.
+        new ZMsg().addLast("query")
+                .addLast(serviceName)
+                .send(socket);
+        dataServiceLocator.process();
+
+        poller.poll(0);
+        assertFalse(poller.pollin(0));
+
+        new ZMsg().addLast("deregister")
+                .addLast(serviceName)
+                .addLast(dataUrl)
+                .send(socket);
+
+        dataServiceLocator.process();
+
+        poller.poll(0);
+        assertTrue(poller.pollin(0));
+
+    }
+
+    @Test
     public void testMultipleRegister() {
         MutableTimeProvider timeProvider = new MutableTimeProvider(Instant.EPOCH);
         dataServiceLocator = new DataServiceLocator(ctx, serviceUrl, timeProvider, new ServiceStore(30, timeProvider));

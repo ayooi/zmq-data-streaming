@@ -61,7 +61,9 @@ public class DataServiceReader implements Runnable {
                         Set<String> locations = new HashSet<>();
                         while (frame != null) {
                             String location = frame.getString(ZMQ.CHARSET);
-                            locations.add(location);
+                            if (!location.isBlank()) {
+                                locations.add(location);
+                            }
                             frame = msg.poll();
                         }
                         doConnects(locations);
