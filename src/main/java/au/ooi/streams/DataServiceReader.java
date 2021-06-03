@@ -9,10 +9,11 @@ import java.util.concurrent.ArrayBlockingQueue;
 
 public class DataServiceReader implements Runnable {
 
-    public static final String THE_IGNORE_ME_MESSAGE = "###IgnoreMe###";
-    private final ZMQ.Socket serviceSocket;
+    private final ZMQ.Socket locatorSocket;
     private final ZMQ.Socket dataSocket;
+    // Used to release blocking recv() calls so that connection changes can take place
     private final ZMQ.Socket controlSocket;
+    public static final String THE_IGNORE_ME_MESSAGE = "###IgnoreMe###";
 
     private final String serviceName;
     @Getter
@@ -23,12 +24,14 @@ public class DataServiceReader implements Runnable {
 
     public DataServiceReader(String serviceName, ZContext ctx, String dataServiceLocatorUrl) {
         this.serviceName = serviceName;
-        serviceSocket = ctx.createSocket(SocketType.DEALER);
+        locatorSocket = ctx.createSocket(SocketType.DEALER);
+        // For now we don't really care what the socket is called as long as its something reasonably unique.
+        // This should probably be replaced with information derived from the running application.
         String identity = UUID.randomUUID().toString();
-        serviceSocket.setIdentity(identity.getBytes(StandardCharsets.UTF_8));
-        serviceSocket.setSendTimeOut(5);
+        locatorSocket.setIdentity(identity.getBytes(StandardCharsets.UTF_8));
+        locatorSocket.setSendTimeOut(5);
         System.out.println("Created reader with identity " + identity);
-        serviceSocket.connect(dataServiceLocatorUrl);
+        locatorSocket.connect(dataServiceLocatorUrl);
 
         controlSocket = ctx.createSocket(SocketType.PUSH);
         String controlUrl = String.format("inproc://%s", UUID.randomUUID());
@@ -36,17 +39,15 @@ public class DataServiceReader implements Runnable {
         dataSocket = ctx.createSocket(SocketType.PULL);
         dataSocket.connect(controlUrl);
 
-        // Probably yoink this out somehow.
         this.runnable = () -> {
             ZMQ.Poller poller = ctx.createPoller(1);
-            poller.register(serviceSocket, ZMQ.Poller.POLLIN);
-            ZMsg queryMsg = new ZMsg();
-            queryMsg.add("query");
-            queryMsg.add(this.serviceName);
-
+            poller.register(locatorSocket, ZMQ.Poller.POLLIN);
             while (true) {
                 try {
-                    boolean send = queryMsg.send(serviceSocket);
+                    boolean send = new ZMsg()
+                            .addLast("query")
+                            .addLast(this.serviceName)
+                            .send(locatorSocket);
                     if (!send) {
                         continue;
                     }
@@ -55,7 +56,7 @@ public class DataServiceReader implements Runnable {
                         return;
                     }
                     if (poller.pollin(0)) {
-                        ZMsg msg = ZMsg.recvMsg(serviceSocket);
+                        ZMsg msg = ZMsg.recvMsg(locatorSocket);
                         ZFrame frame = msg.poll();
                         Set<String> locations = new HashSet<>();
                         while (frame != null) {
@@ -65,7 +66,7 @@ public class DataServiceReader implements Runnable {
                             }
                             frame = msg.poll();
                         }
-                        doConnects(locations);
+                        this.doConnects(locations);
                     }
                 } catch (ZMQException e) {
                     return;
@@ -74,7 +75,7 @@ public class DataServiceReader implements Runnable {
         };
     }
 
-    // Check if we need to adjust what we're connected to
+    // Check if we need to adjust our connections
     private void doConnects(Set<String> incoming) {
         List<String> toConnect = new ArrayList<>();
         for (String location : incoming) {
@@ -89,6 +90,9 @@ public class DataServiceReader implements Runnable {
             }
         }
 
+        // Testing shows that no locking needs to be placed around the DataSocket. Connections can be altered even if
+        // the data socket is in a blocking receive but they will not take effect until the next time the blocking
+        // recv() is released, hence the need for a separate socket to pass a dummy message through.
         if (!toDisconnect.isEmpty() || !toConnect.isEmpty()) {
             for (String location : toDisconnect) {
                 dataSocket.disconnect(location);
@@ -117,6 +121,9 @@ public class DataServiceReader implements Runnable {
 
     void process() throws InterruptedException {
         byte[] recv = dataSocket.recv();
+        // I'm sure this could be optimised to simply send through a unique set of bytes to compare instead of
+        // constructing a string. It would probably require all outgoing data to be prefixed with a byte to denote
+        // whether it is a control or data payload.
         String s = new String(recv);
         if (s.equals(THE_IGNORE_ME_MESSAGE)) {
             return;
