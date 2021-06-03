@@ -29,6 +29,8 @@ public class ServiceStore implements Runnable, ServiceStoreInterface {
 
     private final ArrayBlockingQueue<ExpiredServiceDetails> expiredEvents = new ArrayBlockingQueue<>(1000);
 
+    private final Map<String, Instant> serviceTime = new ConcurrentHashMap<>();
+
     public ServiceStore(int timeoutSeconds, TimeProvider timeProvider) {
         this.timeoutSeconds = timeoutSeconds;
         this.timeProvider = timeProvider;
@@ -52,7 +54,7 @@ public class ServiceStore implements Runnable, ServiceStoreInterface {
         Map<String, Instant> serviceLocations;
         serviceLocations = Objects.requireNonNullElse(existing, incoming);
 
-        Instant existingEntry = serviceLocations.put(location, this.timeProvider.now());
+        Instant existingEntry = serviceLocations.put(location, this.timeProvider.now().plusSeconds(this.timeoutSeconds));
         try {
             queue.put(new ExpiryTracker(serviceName, location, this.timeProvider.now().plusSeconds(this.timeoutSeconds)));
         } catch (InterruptedException e) {
@@ -60,7 +62,12 @@ public class ServiceStore implements Runnable, ServiceStoreInterface {
         }
 
         // Allows callers to know if this should result in an update being pushed.
-        return existing == null || existingEntry == null;
+        if (existing == null || existingEntry == null) {
+            serviceTime.put(serviceName, this.timeProvider.now());
+            return true;
+        } else {
+            return false;
+        }
     }
 
     @Override
@@ -72,10 +79,8 @@ public class ServiceStore implements Runnable, ServiceStoreInterface {
             if (serviceLocations.isEmpty()) {
                 return new ServiceLocations(Collections.emptyList(), this.timeProvider.now());
             }
-            Optional<Instant> first = serviceLocations.values()
-                    .stream().max(Instant::compareTo)
-                    .stream().findFirst();
-            return new ServiceLocations(new ArrayList<>(serviceLocations.keySet()), first.get());
+            Instant instant = Objects.requireNonNullElse(this.serviceTime.get(serviceName), this.timeProvider.now());
+            return new ServiceLocations(new ArrayList<>(serviceLocations.keySet()), instant);
         }
     }
 
@@ -87,6 +92,7 @@ public class ServiceStore implements Runnable, ServiceStoreInterface {
             this.timeProvider.sleep(between.toMillis());
         }
 
+        now = this.timeProvider.now();
         Map<String, Instant> serviceLocations = this.map.get(take.getServiceName());
         Instant instant = serviceLocations.get(take.getLocation());
         if (instant != null && instant.isBefore(now)) {

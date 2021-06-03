@@ -12,7 +12,7 @@ import java.util.concurrent.Executors;
 public class DataServiceLocatorApp {
     public static void main(String[] args) throws InterruptedException {
         RealTimeProvider timeProvider = new RealTimeProvider();
-        ServiceStore serviceStore = new ServiceStore(30, timeProvider);
+        ServiceStore serviceStore = new ServiceStore(10, timeProvider);
         ZContext ctx = new ZContext();
         ExecutorService executorService = Executors.newCachedThreadPool();
 

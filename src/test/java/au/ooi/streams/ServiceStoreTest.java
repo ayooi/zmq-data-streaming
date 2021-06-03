@@ -51,4 +51,23 @@ public class ServiceStoreTest {
         assertFalse(serviceStore.hasEvents());
     }
 
+    @Test
+    public void bounceTimeout() throws InterruptedException {
+        MutableTimeProvider timeProvider = new MutableTimeProvider(Instant.EPOCH);
+        ServiceStore serviceStore = new ServiceStore(5, timeProvider);
+        serviceStore.register("service-name", "location");
+
+        timeProvider.addSeconds(2); // t = 2
+        serviceStore.processTimeout();
+
+        assertFalse(serviceStore.hasEvents());
+
+        assertFalse(serviceStore.register("service-name", "location"));
+
+        timeProvider.addSeconds(4); // t = 6
+
+        serviceStore.processTimeout();
+        assertFalse(serviceStore.hasEvents());
+    }
+
 }
