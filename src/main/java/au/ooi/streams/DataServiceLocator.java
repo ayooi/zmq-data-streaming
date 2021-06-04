@@ -42,6 +42,21 @@ public class DataServiceLocator implements Runnable {
 
         String requestStr = req.getString(ZMQ.CHARSET);
         switch (requestStr) {
+            case "force-query" -> {
+                ZFrame data = msg.poll();
+                assert (data != null);
+                String serviceName = data.getString(ZMQ.CHARSET);
+
+                ServiceLocations serviceLocations = this.serviceStore.query(serviceName);
+                ZMsg result = new ZMsg();
+                result.add(address);
+                if (serviceLocations != null) {
+                    for (String serviceLocation : serviceLocations.getLocations()) {
+                        result.add(serviceLocation);
+                    }
+                }
+                result.send(socket);
+            }
             case "query" -> {
                 ZFrame data = msg.poll();
                 assert (data != null);

@@ -78,26 +78,37 @@ of the controller host suffering issues. Obviously, this is unrealistic.
 
 ### Registration
 
-Frame structure:
+Request:
 
 1. 'register'
 2. \<service-name\>
 3. tcp://\<service-location\>
 
+### Force
+
+Request:
+
+1. 'force-query'
+2. \<service-name\>
+
+Response:
+
+1. \[repeated\] tcp://\<service-location\>
+
 ### Query
 
-Frame Structure:
+Request:
 
 1. 'query'
 2. \<service-name\>
 
-Frame Structure (Rep):
+Response:
 
 1. \[repeated\] tcp://\<service-location\>
 
 ### Deregister
 
-Frame Structure:
+Request:
 
 1. 'deregister'
 2. \<service-name\>
@@ -109,5 +120,12 @@ Frame Structure:
 * Readers expect to have to connect and read data from multiple serviceLocations
 * All data transfer sockets are PUSH/PULL
 * (Optional) support for non-blocking PUSH/PULL sockets
-* (Optional) support for flipping between Writers/Readers being bind or connect. 
+* (Optional) support for flipping between Writers/Readers being bind or connect.
 
+## Bugs
+
+* There currently exists a problem where if the reader disconnects and then reconnects too quickly before the DSL has
+  time to timeout the old pending request, then the DSL will think that it has already sent back a report and if there 
+  are no changes, then the reader will not get a response back. We can do one of two fixes for this: 
+  * We can detect disconnections and expire out the pending request for that socket.
+  * We can add a new command to force a query which clients utilize on first lookup.
