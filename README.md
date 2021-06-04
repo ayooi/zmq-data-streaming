@@ -122,10 +122,13 @@ Request:
 * (Optional) support for non-blocking PUSH/PULL sockets
 * (Optional) support for flipping between Writers/Readers being bind or connect.
 
-## Bugs
+## Bugs & Limitations
 
 * There currently exists a problem where if the reader disconnects and then reconnects too quickly before the DSL has
-  time to timeout the old pending request, then the DSL will think that it has already sent back a report and if there 
-  are no changes, then the reader will not get a response back. We can do one of two fixes for this: 
-  * We can detect disconnections and expire out the pending request for that socket.
-  * We can add a new command to force a query which clients utilize on first lookup.
+  time to timeout the old pending request, then the DSL will think that it has already sent back a report and if there
+  are no changes, then the reader will not get a response back. We can do one of two fixes for this:
+    * We can detect disconnections and expire out the pending request for that socket.
+    * We can add a new command to force a query which clients utilize on first lookup.
+* Another interesting problem (and annoying) is that the address that we're binding to is different to the address that
+  readers have to connect to. For instance, when binding on `tcp://*:19275`, you have to provide to the DSL 
+  `tcp://<hostname>:19275` so I've had to write a weird parse for string urls into it. 

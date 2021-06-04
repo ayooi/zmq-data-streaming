@@ -1,5 +1,6 @@
 package au.ooi.example;
 
+import au.ooi.data.WriteConnectionDetail;
 import au.ooi.streams.DataServiceLocator;
 import au.ooi.streams.DataServiceReader;
 import au.ooi.streams.DataServiceWriter;
@@ -29,7 +30,7 @@ public class SimpleReaderWriter {
         DataServiceLocator dataServiceLocator = new DataServiceLocator(ctx, SERVICE_LOCATOR_URL, timeProvider, serviceStore);
         executorService.submit(dataServiceLocator);
 
-        DataServiceWriter writer = new DataServiceWriter(SERVICE_NAME, "inproc://data-url", ctx, SERVICE_LOCATOR_URL);
+        DataServiceWriter writer = new DataServiceWriter(SERVICE_NAME, WriteConnectionDetail.parse("tcp://localhost:19524"), ctx, SERVICE_LOCATOR_URL);
         writer.startup();
         executorService.submit(writer);
 

@@ -1,5 +1,6 @@
 package au.ooi.streams;
 
+import au.ooi.data.WriteConnectionDetail;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
 import org.zeromq.ZMQ;
@@ -10,15 +11,15 @@ import java.util.UUID;
 
 public class DataServiceWriter implements Runnable {
     private final String serviceName;
+    private final WriteConnectionDetail detail;
     private ZMQ.Socket serviceSocket;
     private ZMQ.Socket dataSocket;
     private final ZContext ctx;
-    private final String dataServiceUrl;
     private final String dataServiceLocatorUrl;
 
-    public DataServiceWriter(String serviceName, String dataServiceUrl, ZContext ctx, String dataServiceLocatorUrl) {
+    public DataServiceWriter(String serviceName, WriteConnectionDetail detail, ZContext ctx, String dataServiceLocatorUrl) {
         this.serviceName = serviceName;
-        this.dataServiceUrl = dataServiceUrl;
+        this.detail = detail;
         this.ctx = ctx;
         this.dataServiceLocatorUrl = dataServiceLocatorUrl;
     }
@@ -26,8 +27,8 @@ public class DataServiceWriter implements Runnable {
     public void startup() {
         this.dataSocket = ctx.createSocket(SocketType.PUSH);
         this.dataSocket.setHWM(1000);
-        this.dataSocket.bind(this.dataServiceUrl);
-        System.out.printf("[Writer] bound to %s%n", this.dataServiceUrl);
+        this.dataSocket.bind(WriteConnectionDetail.listenUrl(this.detail));
+        System.out.printf("[Writer] bound to %s%n", WriteConnectionDetail.listenUrl(this.detail));
         this.serviceSocket = ctx.createSocket(SocketType.DEALER);
         this.serviceSocket.setIdentity(UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8));
         this.serviceSocket.connect(dataServiceLocatorUrl);
@@ -40,7 +41,7 @@ public class DataServiceWriter implements Runnable {
     public void process() {
         serviceSocket.sendMore("register");
         serviceSocket.sendMore(this.serviceName);
-        serviceSocket.send(this.dataServiceUrl);
+        serviceSocket.send(WriteConnectionDetail.announcementUrl(this.detail));
     }
 
     @Override

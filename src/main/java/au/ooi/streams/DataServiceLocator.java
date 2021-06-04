@@ -165,7 +165,7 @@ public class DataServiceLocator implements Runnable {
             try {
                 process();
             } catch (RuntimeException e) {
-                e.printStackTrace();
+                return;
             }
         }
     }

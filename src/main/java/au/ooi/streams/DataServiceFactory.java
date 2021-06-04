@@ -1,6 +1,7 @@
 package au.ooi.streams;
 
 
+import au.ooi.data.WriteConnectionDetail;
 import org.zeromq.ZContext;
 
 import java.util.Map;
@@ -21,7 +22,7 @@ public class DataServiceFactory implements DataServiceFactoryInterface {
 
     @Override
     public DataServiceWriter createWriter(String url, String serviceName) {
-        DataServiceWriter writer = new DataServiceWriter(serviceName, url, this.ctx, this.serviceLocatorUrl);
+        DataServiceWriter writer = new DataServiceWriter(serviceName, WriteConnectionDetail.parse(url), this.ctx, this.serviceLocatorUrl);
         DataServiceWriter existing = this.writers.putIfAbsent(serviceName, writer);
         if (existing == null) {
             writer.startup();

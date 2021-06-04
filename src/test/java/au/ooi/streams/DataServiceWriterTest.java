@@ -1,5 +1,6 @@
 package au.ooi.streams;
 
+import au.ooi.data.WriteConnectionDetail;
 import org.junit.Test;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
@@ -22,7 +23,7 @@ public class DataServiceWriterTest {
         router.bind(locatorUrl);
         String dataUrl = "inproc://random-location";
         String serviceName = "service-name";
-        DataServiceWriter writer = new DataServiceWriter(serviceName, dataUrl, ctx, locatorUrl);
+        DataServiceWriter writer = new DataServiceWriter(serviceName, WriteConnectionDetail.parse(dataUrl), ctx, locatorUrl);
         writer.startup();
         writer.process();
 
@@ -43,7 +44,7 @@ public class DataServiceWriterTest {
         router.bind(locatorUrl);
         String dataUrl = "inproc://random-location";
         String serviceName = "service-name";
-        DataServiceWriter writer = new DataServiceWriter(serviceName, dataUrl, ctx, locatorUrl);
+        DataServiceWriter writer = new DataServiceWriter(serviceName, WriteConnectionDetail.parse(dataUrl), ctx, locatorUrl);
         writer.startup();
 
         ZMQ.Socket pull = ctx.createSocket(SocketType.PULL);

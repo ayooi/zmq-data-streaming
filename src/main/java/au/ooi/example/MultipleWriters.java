@@ -1,5 +1,6 @@
 package au.ooi.example;
 
+import au.ooi.data.WriteConnectionDetail;
 import au.ooi.streams.DataServiceLocator;
 import au.ooi.streams.DataServiceReader;
 import au.ooi.streams.DataServiceWriter;
@@ -25,7 +26,7 @@ public class MultipleWriters {
         DataServiceLocator dataServiceLocator = new DataServiceLocator(ctx, SERVICE_LOCATOR_URL, timeProvider, serviceStore);
         executorService.submit(dataServiceLocator);
 
-        DataServiceWriter writer1 = new DataServiceWriter(SERVICE_NAME, "inproc://data-url-1", ctx, SERVICE_LOCATOR_URL);
+        DataServiceWriter writer1 = new DataServiceWriter(SERVICE_NAME, WriteConnectionDetail.parse("inproc://data-url-1"), ctx, SERVICE_LOCATOR_URL);
         writer1.startup();
         executorService.submit(writer1);
 
@@ -58,7 +59,7 @@ public class MultipleWriters {
                 // ignored
             }
             System.out.println("Starting up writer 2...");
-            DataServiceWriter writer2 = new DataServiceWriter(SERVICE_NAME, "inproc://data-url-2", ctx, SERVICE_LOCATOR_URL);
+            DataServiceWriter writer2 = new DataServiceWriter(SERVICE_NAME, WriteConnectionDetail.parse("inproc://data-url-2"), ctx, SERVICE_LOCATOR_URL);
             writer2.startup();
             executorService.submit(writer2);
             for (int i = 0; i < 5000000; i++) {
